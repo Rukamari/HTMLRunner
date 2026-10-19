@@ -71,7 +71,6 @@ export async function esbuildBundle(
       }
     }
   } catch {
-    // no package.json / build script — fall back to defaults
   }
 
   const entryPath = `${cwd}/${entryPoint}`;
@@ -173,12 +172,10 @@ export async function esbuildBundle(
       try {
         vfs.mkdirSync(dir, { recursive: true });
       } catch {
-        // directory already exists
       }
       try {
         vfs.writeFileSync(outPath, output.contents);
       } catch {
-        // skip unwritable output
       }
       writeln(`  wrote ${outPath.replace(cwd + "/", "")} (${output.contents.length} bytes)`);
     }

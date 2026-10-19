@@ -16,7 +16,6 @@ export function getFileIcon(name: string): string {
   return FILE_ICONS[ext] || "far fa-file-code";
 }
 
-/** Folders currently expanded in the sidebar tree. */
 export const expandedFolders = new Set<string>();
 
 export function renderFileTabs(
@@ -27,7 +26,6 @@ export function renderFileTabs(
   container.innerHTML = "";
 
   for (const file of files) {
-    // Folder placeholders exist only to keep empty folders in the tree.
     if (file.name.endsWith("/.gitkeep")) continue;
 
     const tab = document.createElement("div");

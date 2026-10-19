@@ -156,7 +156,6 @@ export function initializeMenuBar(): void {
     });
   });
 
-  // Handle menu dropdown item clicks
   document.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : null;
     const item = target?.closest<HTMLElement>(".menu-dropdown-item") ?? null;
@@ -167,7 +166,6 @@ export function initializeMenuBar(): void {
 
     closeAllMenus();
 
-    // Compound actions carry their argument in the data attribute.
     if (action.startsWith(OUTPUT_ACTION_PREFIX)) {
       const output = action.slice(OUTPUT_ACTION_PREFIX.length);
       if (isOutputType(output)) switchOutput(output);
@@ -179,7 +177,6 @@ export function initializeMenuBar(): void {
     MENU_ACTION_MAP[action]();
   });
 
-  // Close menus on outside click
   document.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : null;
     if (!target?.closest(".menu-item") && !target?.closest(".menu-dropdown")) {
@@ -187,7 +184,6 @@ export function initializeMenuBar(): void {
     }
   });
 
-  // Close menus on Escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAllMenus();
   });

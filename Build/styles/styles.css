@@ -69,7 +69,6 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
-/* ===== Reset & Base ===== */
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
@@ -88,7 +87,6 @@ body {
   height: 100vh;
 }
 
-/* ===== Menu Bar ===== */
 .menubar {
   display: flex;
   align-items: center;
@@ -142,7 +140,6 @@ body {
   color: var(--text);
 }
 
-/* ===== Buttons ===== */
 .btn {
   padding: 4px 10px;
   border: none;
@@ -196,7 +193,6 @@ body {
   color: var(--text);
 }
 
-/* ===== Main Layout ===== */
 .main {
   flex: 1;
   display: flex;
@@ -211,7 +207,6 @@ body {
   min-width: 0;
 }
 
-/* ===== Menu Dropdowns ===== */
 .menu-dropdown {
   display: none;
   position: fixed;
@@ -256,7 +251,6 @@ body {
   margin: 3px 6px;
 }
 
-/* ===== Editor Panel ===== */
 .editor-header {
   flex-shrink: 0;
 }
@@ -274,7 +268,6 @@ body {
   overflow: hidden;
 }
 
-/* ===== File Tabs ===== */
 .file-tabs {
   display: flex;
   align-items: center;
@@ -355,7 +348,6 @@ body {
 
 .file-tab-add:hover { background: var(--bg-hover); color: var(--text); }
 
-/* ===== Sidebar ===== */
 .sidebar {
   width: var(--sidebar-w);
   min-width: 140px;
@@ -413,7 +405,6 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-/* ===== File Tree ===== */
 .file-tree {
   flex: 1;
   overflow-y: auto;
@@ -481,7 +472,6 @@ body {
   width: 100%;
 }
 
-/* ===== Git Status ===== */
 .git-status {
   padding: 3px 0;
   min-height: 24px;
@@ -524,7 +514,6 @@ body {
   color: var(--text-secondary);
 }
 
-/* ===== Output Panel ===== */
 .output-tabs {
   display: flex;
   background: var(--bg-secondary);
@@ -619,7 +608,6 @@ body {
 .output-content:hover .preview-open-btn { opacity: 1; }
 .preview-open-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ===== Console ===== */
 .console {
   height: 100%;
   padding: 0;
@@ -743,7 +731,6 @@ body {
   display: block;
 }
 
-/* ===== Console Filters ===== */
 .console-filters {
   display: flex;
   gap: 4px;
@@ -781,7 +768,6 @@ body {
 
 .console-entry.filtered { display: none; }
 
-/* ===== Copy Button ===== */
 .copy-btn {
   position: absolute;
   right: 6px;
@@ -805,7 +791,6 @@ body {
 .editor-container:hover .copy-btn { opacity: 1; }
 .copy-btn i { font-size: var(--font-size-sm); }
 
-/* ===== Loading ===== */
 .loading {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -842,7 +827,6 @@ body {
   100% { transform: rotate(360deg); }
 }
 
-/* ===== Status Message ===== */
 .error-message {
   background: var(--danger-bg);
   color: var(--danger);
@@ -870,7 +854,6 @@ body {
   border-left-color: var(--info);
 }
 
-/* ===== Split.js Gutter ===== */
 .gutter {
   background-color: var(--border-subtle);
   transition: background-color 0.15s;
@@ -890,11 +873,9 @@ body {
   height: 5px !important;
 }
 
-/* ===== Resizing ===== */
 .resizing-col { cursor: col-resize !important; }
 .resizing-row { cursor: row-resize !important; }
 
-/* ===== Search Controls ===== */
 .search-controls {
   margin-left: auto;
   display: flex;
@@ -924,7 +905,6 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* ===== CodeMirror 6 Search ===== */
 .cm-panels {
   background: var(--bg-secondary) !important;
   border-bottom: 1px solid var(--border) !important;
@@ -971,7 +951,6 @@ body {
   border: 1px solid rgba(255, 198, 0, 0.4) !important;
 }
 
-/* ===== Status Bar ===== */
 .status-bar {
   display: flex;
   align-items: center;
@@ -997,7 +976,6 @@ body {
   font-size: var(--font-size-xs);
 }
 
-/* ===== Context Menu ===== */
 .tab-context-menu {
   position: fixed;
   z-index: 9999;
@@ -1033,7 +1011,6 @@ body {
 
 .context-menu-item .danger { color: #e53935; }
 
-/* ===== Info Dialog ===== */
 .info-dialog-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -1090,7 +1067,6 @@ body {
 
 .info-dialog-body a { color: var(--accent); }
 
-/* ===== Responsive ===== */
 @media (max-width: 768px) {
   .main { flex-direction: column; }
   .editor-panel, .output-panel { height: 50%; }

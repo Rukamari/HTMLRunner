@@ -48,7 +48,6 @@ async function runShellCommand(line: string): Promise<void> {
       onStderr: (data) => write(data),
     });
     if (result.exitCode !== 0 && result.stderr) {
-      // stderr already streamed via onStderr
     }
   } catch (err) {
     writeln(`Error: ${err instanceof Error ? err.message : String(err)}`);

@@ -40,7 +40,6 @@ function isNumberPair(value: unknown): value is [number, number] {
   );
 }
 
-/** Validate untrusted localStorage JSON before it reaches typed state. */
 export function parseStateSnapshot(raw: unknown): Partial<State> {
   if (!isRecord(raw)) return {};
 
@@ -84,7 +83,6 @@ export function parseStateSnapshot(raw: unknown): Partial<State> {
 
   if (Array.isArray(rawFilters)) {
     const filters: LogLevel[] = rawFilters.filter(isLogLevel);
-    // An empty list is meaningful (all levels hidden); only drop malformed lists.
     if (filters.length > 0 || rawFilters.length === 0) {
       snapshot.logFilters = filters;
     }

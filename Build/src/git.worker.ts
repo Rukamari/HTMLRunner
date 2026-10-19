@@ -23,7 +23,7 @@ async function withRetry<T>(fn: () => T | Promise<T>, maxRetries = 2): Promise<T
         msg.includes("stale") ||
         msg.includes("state has changed");
       if (isStale && i < maxRetries && git) {
-        try { await git.syncRepo(REPO_NAME); } catch { /* still retrying */ }
+        try { await git.syncRepo(REPO_NAME); } catch {  }
         continue;
       }
       throw err;
@@ -40,7 +40,7 @@ async function runGitCommand(command: string, gitArgs: string[]): Promise<string
   const origPrint = git.module.print;
   const origPrintErr = git.module.printErr;
   git.module.print = (text: string) => stdout.push(text);
-  git.module.printErr = () => { /* discard stderr noise */ };
+  git.module.printErr = () => {  };
 
   try {
     await git.run([command, ...gitArgs]);
@@ -69,11 +69,6 @@ function isDirectory(path: string): boolean {
   }
 }
 
-/**
- * Recursively list repo files with their contents, relative to the repo root.
- * Skips git internals, node_modules and binary assets that can't be usefully
- * represented in the editor.
- */
 function readAllFiles(): GitFile[] {
   if (!git) return [];
   const root = git.repoDir(REPO_NAME);
@@ -104,7 +99,6 @@ function readAllFiles(): GitFile[] {
           results.push({ path: rel, content: new TextDecoder().decode(content) });
         }
       } catch {
-        // unreadable file (e.g. submodule, broken symlink) — skip
       }
     }
   };
@@ -148,7 +142,6 @@ const api: GitWorkerAPI = {
         try {
           git!.FS.unlink(path);
         } catch {
-          // File may not exist — deletion is best-effort.
         }
       });
     });

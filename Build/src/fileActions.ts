@@ -28,7 +28,6 @@ export function splitFileName(name: string): [string, string] {
   return [stem, base.slice(dot)];
 }
 
-/** Return a name that doesn't collide with an existing file. */
 export function uniqueFileName(files: FileTab[], desired: string): string {
   if (!files.some((f) => f.name === desired)) return desired;
   const [stem, ext] = splitFileName(desired);
@@ -59,7 +58,6 @@ function openNewFile(files: FileTab[], fileName: string, content: string): void 
   syncFileToWorker(fileName, content);
 }
 
-/** Restore the demo project and remove the files it replaced. */
 export function resetWorkspaceAction(skipConfirmation = false): void {
   if (
     !skipConfirmation &&
@@ -142,7 +140,6 @@ function deleteFiles(paths: string[]): void {
   for (const path of paths) {
     deleteFileFromWorker(path);
   }
-  // Drop folder expansion state for folders that no longer contain files.
   const remaining = filesState.get();
   for (const folder of Array.from(expandedFolders)) {
     if (!remaining.some((f) => f.name.startsWith(folder + "/"))) {
@@ -253,7 +250,6 @@ export function deleteFolderAction(folderPath: string): void {
     if (next) {
       switchToFile(next);
     } else {
-      // Never leave the editor with zero files.
       const fallback = createFile("untitled.html", getTemplateForExt("html"));
       filesState.set([fallback]);
       switchToFile(fallback);

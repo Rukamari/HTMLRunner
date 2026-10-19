@@ -18,7 +18,6 @@ export interface TreeNode {
   children: TreeNode[];
 }
 
-/** Folders sort before files; siblings are sorted case-insensitively. */
 export function sortTreeNodes(nodes: TreeNode[]): void {
   nodes.sort((a, b) => {
     if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
@@ -53,7 +52,6 @@ export function buildFileTree(files: FileTab[]): TreeNode[] {
         if (isFile) existing.file = file;
         current.push(existing);
       } else if (isFile) {
-        // A file now exists where a folder placeholder used to be.
         existing.isFile = true;
         existing.file = file;
       }

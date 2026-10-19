@@ -1,6 +1,4 @@
-/** Simple modal dialog used for git output, About and shortcuts. */
 export function showInfoDialog(title: string, body: string): void {
-  // Remove existing dialog
   document.querySelector(".info-dialog-overlay")?.remove();
 
   const overlay = document.createElement("div");

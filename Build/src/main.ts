@@ -346,7 +346,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   startGitStatusPolling();
 
-  // Keep the sandbox VFS and git worker in sync with editor state.
   effect(() => {
     const files = filesState.get();
     if (isGitReady()) {

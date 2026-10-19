@@ -1,4 +1,3 @@
-/** Resolve a relative import against an absolute POSIX-style base path. */
 export function resolvePath(base: string, relative: string): string {
   const parts = base.split("/");
   for (const seg of relative.split("/")) {

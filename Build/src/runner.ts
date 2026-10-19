@@ -28,8 +28,6 @@ async function ensureDevServer(): Promise<boolean> {
     if (!devServer) {
       const server = new ViteDevServer(vfs, { port: 3000, root: "/sandbox" });
       devServer = server;
-      // Adapt DevServer's `isRunning`/port API to the bridge's IVirtualServer
-      // contract explicitly instead of asserting through `unknown`.
       serverBridge.registerServer(
         {
           get listening() {
@@ -147,7 +145,6 @@ let prettierBundlePromise: Promise<PrettierBundle> | undefined;
 
 type ModuleWithDefault<T> = T & { default?: T };
 
-/** Vite wraps some CommonJS Prettier plugins in a `default` export. */
 function moduleDefault<T>(module: ModuleWithDefault<T>): T {
   return module.default ?? module;
 }
@@ -247,7 +244,6 @@ function syncFilesToDevServer(files: FileTab[]): void {
       try {
         vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
       } catch {
-        // directory already exists
       }
     }
     const content = /\.html?$/i.test(file.name)
@@ -256,16 +252,10 @@ function syncFilesToDevServer(files: FileTab[]): void {
     try {
       vfs.writeFileSync(`/sandbox/${file.name}`, content);
     } catch {
-      // skip unwritable file
     }
   }
 }
 
-/**
- * Inject the console/navigation interception script into an HTML document,
- * whether or not it has a <head>. Documents without a <head> get wrapped in a
- * minimal skeleton so console capture still works.
- */
 export function injectInterceptors(html: string): string {
   const script = `<script>${consoleInterceptor}${navigationInterceptor}</script>`;
   if (/<head[^>]*>/i.test(html)) {

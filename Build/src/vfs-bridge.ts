@@ -21,7 +21,6 @@ export function initBridge(): void {
   });
 }
 
-/** Write a file into the sandbox VFS (creating parent folders as needed). */
 export function syncFileToVFS(name: string, content: string): void {
   const vfs = getVFS();
   const dir = name.substring(0, name.lastIndexOf("/"));
@@ -29,13 +28,11 @@ export function syncFileToVFS(name: string, content: string): void {
     try {
       vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
     } catch {
-      // directory already exists
     }
   }
   try {
     vfs.writeFileSync(`/sandbox/${name}`, content);
   } catch {
-    // skip unwritable file
   }
 }
 

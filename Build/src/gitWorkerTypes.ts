@@ -13,7 +13,6 @@ export interface GitCommandResult {
   files?: GitFile[];
 }
 
-/** The Comlink contract shared by the worker and the main thread. */
 export interface GitWorkerAPI {
   init(user?: string, email?: string): Promise<GitInitResult>;
   writeFile(filePath: string, content: string): Promise<void>;

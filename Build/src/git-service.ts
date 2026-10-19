@@ -58,13 +58,11 @@ function loadFilesFromWorker(files: GitFile[]): void {
       try {
         vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
       } catch {
-        // directory already exists
       }
     }
     try {
       vfs.writeFileSync(`/sandbox/${file.path}`, file.content);
     } catch {
-      // skip unwritable file
     }
   }
 
@@ -147,10 +145,9 @@ export async function syncFileToWorker(
   api.writeFile(filePath, content).catch(() => {});
 }
 
-/** Remove a file from the git worker's repo and the sandbox VFS. */
 export function deleteFileFromWorker(filePath: string): void {
   if (api) api.deleteFile(filePath).catch(() => {});
-  try { getVFS().unlinkSync(`/sandbox/${filePath}`); } catch { /* may not exist */ }
+  try { getVFS().unlinkSync(`/sandbox/${filePath}`); } catch {  }
 }
 
 export async function syncAllFilesToWorker(): Promise<void> {

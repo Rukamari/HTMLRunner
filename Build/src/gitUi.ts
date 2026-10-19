@@ -37,7 +37,6 @@ export async function refreshGitStatus(): Promise<void> {
     const output = await gitStatus();
     renderGitStatus(statusEl, output);
   } catch {
-    // VFS not ready yet
   }
 }
 
@@ -138,7 +137,6 @@ export async function cloneAction(): Promise<void> {
   }
 }
 
-/** Start polling git status; returns a cleanup function. */
 export function startGitStatusPolling(intervalMs = 5000): () => void {
   const timer = setInterval(() => {
     if (isGitReady()) {

@@ -1,8 +1,3 @@
-/**
- * Convert a UTF-8 byte offset (as reported by Biome) into a UTF-16 code unit
- * offset usable with CodeMirror. Clamped to the end of the text so malformed
- * spans can never produce an out-of-range position.
- */
 export function byteToCharOffset(text: string, byteOffset: number): number {
   if (byteOffset <= 0) return 0;
   let byteIdx = 0;

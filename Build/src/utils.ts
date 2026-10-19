@@ -36,7 +36,6 @@ export function parseCommandLine(line: string): string[] {
   return result;
 }
 
-// Copy text to clipboard utility
 export async function copyToClipboard(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);

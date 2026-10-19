@@ -126,13 +126,9 @@ export function createTerminal(el: HTMLElement): void {
         }
       }
     } else if (key === "\x1b[C") {
-      // Right arrow - ignore
     } else if (key === "\x1b[D") {
-      // Left arrow - ignore
     } else if (domEvent.ctrlKey && key === "a") {
-      // Home - ignore (no cursor movement support)
     } else if (domEvent.ctrlKey && key === "e") {
-      // End - ignore
     } else if (key.length === 1 && !domEvent.ctrlKey && !domEvent.altKey && !domEvent.metaKey) {
       lineBuffer += key;
       term?.write(key);
@@ -148,7 +144,6 @@ export function fitTerminal(): void {
   try {
     fitAddon?.fit();
   } catch {
-    // not mounted
   }
 }
 

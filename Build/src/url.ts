@@ -4,7 +4,6 @@ export function normalizeInternalHref(href: string): string {
   try {
     path = decodeURIComponent(path);
   } catch {
-    // leave path as-is when it isn't valid percent-encoding
   }
   return path.replace(/^\.\//, "").replace(/^\/+/, "");
 }

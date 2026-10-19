@@ -9,7 +9,6 @@ import { signal, effect, path } from "@nisoku/sairin";
 import { logFilters } from "./appState";
 import { getById } from "./dom";
 
-// Signal holding the console messages for reactive rendering
 export const consoleEntries = signal(
   path("htmlrunner", "console", "entries"),
   [] as ConsoleMessage[],
@@ -27,7 +26,6 @@ function pushConsoleEntry(entry: ConsoleMessage): void {
   consoleEntries.set(next);
 }
 
-// Cached DOM node (set during initializeConsole when DOM is ready)
 let consoleOutputEl: HTMLDivElement | null = null;
 
 function renderConsoleEntries(
@@ -70,9 +68,9 @@ function renderConsoleEntries(
         let lineNum: number | undefined;
         let colNum: number | undefined;
         const patterns: RegExp[] = [
-          /\(([^)]+):(\d+):(\d+)\)$/, // at fn (file:line:col)
-          /([^@()\s]+):(\d+):(\d+)$/, // fn@file:line:col or file:line:col
-          /([^@()\s]+):(\d+)$/, // file:line
+          /\(([^)]+):(\d+):(\d+)\)$/,
+          /([^@()\s]+):(\d+):(\d+)$/,
+          /([^@()\s]+):(\d+)$/,
         ];
         for (const pat of patterns) {
           const m = line.match(pat);
@@ -118,7 +116,6 @@ function renderConsoleEntries(
   consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
 }
 
-// Re-render console output whenever entries or filters change
 effect(() => {
   const entries = consoleEntries.get();
   const filters = logFilters.get();
@@ -151,11 +148,8 @@ document.addEventListener('click', function(e) {
 });
 `;
 
-// Initialize console message handler
 export function initializeConsole(): void {
-  // Cache the console output element now that DOM is ready
   consoleOutputEl = getById("console", HTMLDivElement);
-  // render any existing entries immediately
   if (consoleOutputEl) renderConsoleEntries(consoleEntries.get());
   window.addEventListener("message", handleConsoleMessage);
 }

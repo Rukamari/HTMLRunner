@@ -21,10 +21,6 @@ export function hideLoading(): void {
   loadingVisible.set(false);
 }
 
-/**
- * Show a transient status message. A new message always replaces the previous
- * one and resets the dismissal timer, so an older timer can never clear it.
- */
 export function showToast(message: string, kind: ToastKind = "info"): void {
   if (toastTimer !== null) {
     clearTimeout(toastTimer);

@@ -9,13 +9,11 @@ describe("byteToCharOffset", () => {
   });
 
   it("accounts for multi-byte characters", () => {
-    // "é" is two UTF-8 bytes but one UTF-16 code unit.
     expect(byteToCharOffset("é", 2)).toBe(1);
     expect(byteToCharOffset("aé b", 3)).toBe(2);
   });
 
   it("accounts for surrogate pairs", () => {
-    // "😀" is four UTF-8 bytes and two UTF-16 code units.
     expect(byteToCharOffset("😀", 4)).toBe(2);
     expect(byteToCharOffset("a😀b", 5)).toBe(3);
   });

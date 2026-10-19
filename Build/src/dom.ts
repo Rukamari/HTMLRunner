@@ -1,6 +1,5 @@
 type ElementConstructor<T extends Element> = { new (): T };
 
-/** Get an element by id and verify its concrete DOM class at runtime. */
 export function getById<T extends Element>(
   id: string,
   ctor: ElementConstructor<T>,
@@ -9,7 +8,6 @@ export function getById<T extends Element>(
   return element instanceof ctor ? element : null;
 }
 
-/** Query a single element and verify its concrete DOM class at runtime. */
 export function queryOne<T extends Element>(
   selector: string,
   ctor: ElementConstructor<T>,
