@@ -9,16 +9,31 @@ export const consoleEntries = signal(
   [] as ConsoleMessage[],
 );
 
+/** Keep memory bounded when the preview logs in a tight loop. */
+const MAX_CONSOLE_ENTRIES = 1000;
+
+function pushConsoleEntry(entry: ConsoleMessage): void {
+  const prev = consoleEntries.get();
+  const next =
+    prev.length >= MAX_CONSOLE_ENTRIES
+      ? [...prev.slice(prev.length - MAX_CONSOLE_ENTRIES + 1), entry]
+      : [...prev, entry];
+  consoleEntries.set(next);
+}
+
 // Cached DOM node (set during initializeConsole when DOM is ready)
 let consoleOutputEl: HTMLDivElement | null = null;
 
-function renderConsoleEntries(entries: ConsoleMessage[]): void {
+function renderConsoleEntries(
+  entries: ConsoleMessage[],
+  filters: string[] = logFilters.get(),
+): void {
   if (!consoleOutputEl) return;
+  const activeFilters = new Set(filters);
   const frag = document.createDocumentFragment();
   for (const ev of entries) {
     const entry = document.createElement("div");
-    const filters = logFilters.get();
-    const filtered = !filters.includes(ev.level);
+    const filtered = !activeFilters.has(ev.level);
     entry.className = `console-entry${filtered ? " filtered" : ""}`;
 
     const timestamp = document.createElement("span");
@@ -103,11 +118,12 @@ function renderConsoleEntries(entries: ConsoleMessage[]): void {
   consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
 }
 
-// Re-render console output whenever entries change
+// Re-render console output whenever entries or filters change
 effect(() => {
   const entries = consoleEntries.get();
+  const filters = logFilters.get();
   if (!consoleOutputEl) return;
-  renderConsoleEntries(entries);
+  renderConsoleEntries(entries, filters);
 });
 
 export const consoleInterceptor = `
@@ -146,8 +162,7 @@ export function initializeConsole(): void {
 function handleConsoleMessage(event: MessageEvent<ConsoleMessage>): void {
   if (event.origin !== location.origin) return;
   if (event.data?.type !== "console") return;
-  const prev = consoleEntries.get();
-  consoleEntries.set([...prev, event.data]);
+  pushConsoleEntry(event.data);
 }
 
 function renderObject(
@@ -220,12 +235,11 @@ export function clearConsole(): void {
 }
 
 export function logConsoleError(message: string, stack: StackInfo = {}): void {
-  const prev = consoleEntries.get();
   const entry: ConsoleMessage = {
     type: "console",
     level: "error",
     data: [message, stack],
     timestamp: new Date().toISOString(),
   };
-  consoleEntries.set([...prev, entry]);
+  pushConsoleEntry(entry);
 }

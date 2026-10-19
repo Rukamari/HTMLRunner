@@ -7,6 +7,7 @@ import type { FileTab } from "./types";
 interface GitWorkerAPI {
   init(user?: string, email?: string): Promise<{ variant: string; files: { path: string; content: string }[] }>;
   writeFile(filePath: string, content: string): Promise<void>;
+  deleteFile(filePath: string): Promise<void>;
   gitCommand(command: string, args: string[]): Promise<{ stdout: string; files?: { path: string; content: string }[] }>;
   readFiles(): Promise<{ path: string; content: string }[]>;
   sync(): Promise<void>;
@@ -64,9 +65,17 @@ function loadFilesFromWorker(
 
     const dir = file.path.substring(0, file.path.lastIndexOf("/"));
     if (dir) {
-      try { vfs.mkdirSync(dir, { recursive: true }); } catch {}
+      try {
+        vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
+      } catch {
+        // directory already exists
+      }
     }
-    try { vfs.writeFileSync(`/sandbox/${file.path}`, file.content); } catch {}
+    try {
+      vfs.writeFileSync(`/sandbox/${file.path}`, file.content);
+    } catch {
+      // skip unwritable file
+    }
   }
 
   tabs.sort((a, b) => a.name.localeCompare(b.name));
@@ -147,12 +156,18 @@ export async function syncFileToWorker(
   api.writeFile(filePath, content).catch(() => {});
 }
 
+/** Remove a file from the git worker's repo and the sandbox VFS. */
+export function deleteFileFromWorker(filePath: string): void {
+  if (api) api.deleteFile(filePath).catch(() => {});
+  try { getVFS().unlinkSync(`/sandbox/${filePath}`); } catch { /* may not exist */ }
+}
+
 export async function syncAllFilesToWorker(): Promise<void> {
   if (!api) return;
   const files = filesState.get();
-  for (const file of files) {
-    api.writeFile(file.name, file.content).catch(() => {});
-  }
+  await Promise.all(
+    files.map((file) => api!.writeFile(file.name, file.content).catch(() => {})),
+  );
 }
 
 export async function requestFilesFromWorker(): Promise<void> {

@@ -4,7 +4,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/HTMLToolkit/HTMLRunner/static.yml)
+[![CI](https://github.com/HTMLToolkit/HTMLRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/HTMLToolkit/HTMLRunner/actions/workflows/ci.yml)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/HTMLToolkit/HTMLRunner/static.yml)](https://github.com/HTMLToolkit/HTMLRunner/actions/workflows/static.yml)
 
 A powerful, browser-based HTML/CSS/JavaScript code editor and live preview tool. Write, test, and debug your web code with real-time execution and an integrated console.
 
@@ -14,7 +15,7 @@ A powerful, browser-based HTML/CSS/JavaScript code editor and live preview tool.
 
 - **HTML Editor** with syntax highlighting and auto-completion
 - **CSS Editor** with live styling preview
-- **JavaScript Editor** with linting and error detection
+- **JavaScript Editor** with linting (Biome) and error detection
 - **Syntax Highlighting** powered by CodeMirror
 - **Auto-indentation** and bracket matching
 
@@ -29,6 +30,7 @@ A powerful, browser-based HTML/CSS/JavaScript code editor and live preview tool.
 
 - **Integrated Console** with log filtering (log, error, warn, info)
 - **Code Formatting** using Prettier
+- **Integrated Terminal** powered by xterm.js
 - **Export Functionality** - Download your project as a ZIP file
 - **Copy to Clipboard** for individual editors or console output
 - **Responsive Split-Panel** layout
@@ -65,7 +67,7 @@ Visit the live version at: [https://htmltoolkit.github.io/HTMLRunner/](https://h
 
 ### Single File
 
-You can build a single, standalone HTML file with all assets embedded:
+You can build a single, standalone HTML file with all assets embedded (run from the `Build/` directory):
 
 ```bash
 npm run build:single
@@ -105,7 +107,7 @@ HTMLRunner comes with a demo project to get you started:
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <script src="main.js"></script>
+    <script src="script.js"></script>
     <h1>Hello, HTMLRunner!</h1>
     <p>This is a demo page.</p>
     <button onclick="testFunction()">Click me!</button>
@@ -152,17 +154,20 @@ function testFunction() {
 
 - **Code Editor:** CodeMirror 6
 - **Code Formatting:** Prettier
+- **Linting:** Biome (compiled to WebAssembly and run in the browser)
 - **UI Layout:** Split.js for resizable panels
-- **Build Tool:** Vite for fast compilation
-- **PWA Support:** vite-plugin-pwa for offline support
+- **Terminal:** xterm.js
+- **Virtual Runtime:** almostnode (virtual filesystem and in-browser dev server) with wasm-git for version control
+- **Export:** JSZip for project downloads
+- **Build Tool:** Vite
 - **Single File Build:** vite-plugin-singlefile for standalone HTML
 
 ## Development
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
+- Node.js (v20 or higher)
+- npm
 
 ### Local Development Setup
 
@@ -176,7 +181,7 @@ function testFunction() {
 2. **Install dependencies**
 
    ```bash
-   npm install
+   npm ci
    ```
 
 3. **Start development server**
@@ -208,6 +213,17 @@ function testFunction() {
    ```bash
    npm run preview
    ```
+
+### Quality Checks
+
+Run these from the `Build/` directory (CI runs the same commands):
+
+```bash
+npm run typecheck   # TypeScript, no emit
+npm run lint        # ESLint
+npm test            # Vitest unit tests
+npm run build       # Production build
+```
 
 ### Contributors
 

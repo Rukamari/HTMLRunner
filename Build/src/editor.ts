@@ -143,18 +143,20 @@ export function createEditor(container: HTMLElement, initialFile: FileTab): void
   editor.view = view;
 }
 
-export function switchToFile(file: FileTab): void {
+export function switchToFile(file: FileTab, saveCurrent = true): void {
   if (!editor.view) return;
 
   _suppressContentUpdate = true;
 
-  const currentContent = editor.view.state.doc.toString();
-  const currentId = activeFileState.get();
-  const files = filesState.get();
-  const updated = files.map((f) =>
-    f.id === currentId ? { ...f, content: currentContent } : f,
-  );
-  filesState.set(updated);
+  if (saveCurrent) {
+    const currentContent = editor.view.state.doc.toString();
+    const currentId = activeFileState.get();
+    const files = filesState.get();
+    const updated = files.map((f) =>
+      f.id === currentId ? { ...f, content: currentContent } : f,
+    );
+    filesState.set(updated);
+  }
 
   activeFileState.set(file.id);
 

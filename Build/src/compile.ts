@@ -1,4 +1,5 @@
 import { getVFS, isContainerReady } from "./container";
+import { resolvePath } from "./paths";
 
 let esbuildInitialized = false;
 
@@ -35,19 +36,6 @@ function vfsStat(path: string): boolean {
   }
 }
 
-function resolvePath(base: string, relative: string): string {
-  const parts = base.split("/");
-  for (const seg of relative.split("/")) {
-    if (seg === "." || seg === "") continue;
-    if (seg === "..") {
-      if (parts.length > 1) parts.pop();
-    } else {
-      parts.push(seg);
-    }
-  }
-  return parts.join("/");
-}
-
 export async function esbuildBundle(
   cwd: string,
   write: (text: string) => void,
@@ -82,7 +70,9 @@ export async function esbuildBundle(
         external = extMatch.map((m: string) => m.replace("--external:", ""));
       }
     }
-  } catch {}
+  } catch {
+    // no package.json / build script — fall back to defaults
+  }
 
   const entryPath = `${cwd}/${entryPoint}`;
   const entryContent = vfsReadFile(entryPath);
@@ -180,8 +170,16 @@ export async function esbuildBundle(
     for (const output of result.outputFiles) {
       const outPath = output.path.startsWith("/") ? output.path : `${cwd}/${output.path}`;
       const dir = outPath.substring(0, outPath.lastIndexOf("/"));
-      try { vfs.mkdirSync(dir, { recursive: true }); } catch {}
-      try { vfs.writeFileSync(outPath, output.contents); } catch {}
+      try {
+        vfs.mkdirSync(dir, { recursive: true });
+      } catch {
+        // directory already exists
+      }
+      try {
+        vfs.writeFileSync(outPath, output.contents);
+      } catch {
+        // skip unwritable output
+      }
       writeln(`  wrote ${outPath.replace(cwd + "/", "")} (${output.contents.length} bytes)`);
     }
     writeln("Build complete!");

@@ -51,7 +51,13 @@ export interface Actions {
   toggleDarkMode: () => void;
   switchFile: (id: string) => void;
   addFile: () => void;
+  addFolder: () => void;
   closeFile: (id: string) => void;
+  importFiles: () => void;
+  renameFile: (id: string) => void;
+  duplicateFile: (id: string) => void;
+  closeOthers: (id: string) => void;
+  closeAll: () => void;
   switchOutput: (output: string) => void;
   exportAsZip: () => Promise<void>;
   copyAllConsole: () => void;

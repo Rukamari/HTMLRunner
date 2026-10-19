@@ -1,6 +1,7 @@
 import { expose } from "comlink";
+import type { OpfsGit } from "wasm-git/lg2_opfs_auto.js";
 
-let git: any = null;
+let git: OpfsGit | null = null;
 const REPO_NAME = "sandbox";
 let _mutex: Promise<unknown> = Promise.resolve();
 
@@ -10,18 +11,18 @@ function queue<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function withRetry<T>(fn: () => T, maxRetries = 2): Promise<T> {
+async function withRetry<T>(fn: () => T | Promise<T>, maxRetries = 2): Promise<T> {
   for (let i = 0; i <= maxRetries; i++) {
     try {
-      return fn();
-    } catch (err: any) {
-      const msg = err?.message || String(err);
+      return await fn();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       const isStale =
         msg.includes("cached in an interface object") ||
         msg.includes("stale") ||
         msg.includes("state has changed");
       if (isStale && i < maxRetries && git) {
-        try { await git.syncRepo(REPO_NAME); } catch {}
+        try { await git.syncRepo(REPO_NAME); } catch { /* still retrying */ }
         continue;
       }
       throw err;
@@ -38,7 +39,7 @@ async function runGitCommand(command: string, gitArgs: string[]): Promise<string
   const origPrint = git.module.print;
   const origPrintErr = git.module.printErr;
   git.module.print = (text: string) => stdout.push(text);
-  git.module.printErr = (_text: string) => {};
+  git.module.printErr = () => { /* discard stderr noise */ };
 
   try {
     await git.run([command, ...gitArgs]);
@@ -50,23 +51,64 @@ async function runGitCommand(command: string, gitArgs: string[]): Promise<string
   return stdout.join("\n");
 }
 
+const SKIP_NAMES = new Set([".", "..", ".git", "node_modules"]);
+const SKIP_EXTS = new Set([
+  "png", "jpg", "jpeg", "gif", "ico", "svg", "webp",
+  "woff", "woff2", "ttf", "eot", "otf",
+  "zip", "gz", "wasm", "mp3", "mp4", "pdf",
+]);
+
+function isDirectory(path: string): boolean {
+  if (!git) return false;
+  try {
+    const entries = git.FS.readdir(path);
+    return Array.isArray(entries);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Recursively list repo files with their contents, relative to the repo root.
+ * Skips git internals, node_modules and binary assets that can't be usefully
+ * represented in the editor.
+ */
 function readAllFiles(): { path: string; content: string }[] {
   if (!git) return [];
+  const root = git.repoDir(REPO_NAME);
   const results: { path: string; content: string }[] = [];
-  try {
-    const entries = git.readdir(REPO_NAME);
-    for (const name of entries) {
-      if (name === "." || name === ".." || name === ".git" || name === "node_modules") continue;
-      try {
-        const content = git.readFile(REPO_NAME, name);
-        if (typeof content === "string") {
-          results.push({ path: name, content });
-        } else if (content instanceof Uint8Array) {
-          results.push({ path: name, content: new TextDecoder().decode(content) });
-        }
-      } catch {}
+
+  const walk = (dir: string, prefix: string): void => {
+    let entries: string[];
+    try {
+      entries = git!.FS.readdir(dir);
+    } catch {
+      return;
     }
-  } catch {}
+    for (const name of entries) {
+      if (SKIP_NAMES.has(name)) continue;
+      const full = `${dir}/${name}`;
+      const rel = prefix ? `${prefix}/${name}` : name;
+      if (isDirectory(full)) {
+        walk(full, rel);
+        continue;
+      }
+      const ext = name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
+      if (SKIP_EXTS.has(ext)) continue;
+      try {
+        const content: unknown = git!.readFile(REPO_NAME, rel);
+        if (typeof content === "string") {
+          results.push({ path: rel, content });
+        } else if (content instanceof Uint8Array) {
+          results.push({ path: rel, content: new TextDecoder().decode(content) });
+        }
+      } catch {
+        // unreadable file (e.g. submodule, broken symlink) — skip
+      }
+    }
+  };
+
+  walk(root, "");
   return results;
 }
 
@@ -92,8 +134,23 @@ const api = {
 
   async writeFile(filePath: string, content: string) {
     return queue(() =>
-      withRetry(() => git.writeFile(REPO_NAME, filePath, content)),
+      withRetry(() => git!.writeFile(REPO_NAME, filePath, content)),
     );
+  },
+
+  async deleteFile(filePath: string) {
+    return queue(async () => {
+      if (!git) throw new Error("Git not initialized");
+      await git.syncRepo(REPO_NAME);
+      const path = `${git.repoDir(REPO_NAME)}/${filePath}`;
+      await withRetry(() => {
+        try {
+          git!.FS.unlink(path);
+        } catch {
+          // File may not exist — deletion is best-effort.
+        }
+      });
+    });
   },
 
   async gitCommand(command: string, args: string[]) {

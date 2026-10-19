@@ -1,4 +1,5 @@
 import initBiomeWasm, { Workspace } from "@biomejs/wasm-web";
+import { byteToCharOffset } from "./encoding";
 
 let workspace: Workspace | null = null;
 let projectKey: number | null = null;
@@ -10,24 +11,6 @@ export type BiomeDiag = {
   severity: "error" | "warning" | "info";
   message: string;
 };
-
-function byteToCharOffset(text: string, byteOffset: number): number {
-  let charIdx = 0;
-  for (let i = 0; i < byteOffset; charIdx++) {
-    const code = text.charCodeAt(charIdx);
-    if (code < 0x80) {
-      i += 1;
-    } else if (code < 0x800) {
-      i += 2;
-    } else if (code >= 0xd800 && code <= 0xdfff) {
-      i += 4;
-      charIdx++;
-    } else {
-      i += 3;
-    }
-  }
-  return charIdx;
-}
 
 export async function initBiome(): Promise<void> {
   if (initialized) return;

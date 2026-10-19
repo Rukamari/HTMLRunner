@@ -4,10 +4,11 @@ import { clearConsole, logConsoleError } from "./console";
 import { filesState, activeFileState } from "./appState";
 import { getVFS, isContainerReady } from "./container";
 import { marked } from "marked";
+import type { ViteDevServer, ServerBridge } from "almostnode";
 import type { FileTab } from "./types";
 
-let devServer: any = null;
-let serverBridge: any = null;
+let devServer: ViteDevServer | null = null;
+let serverBridge: ServerBridge | null = null;
 let previewReady = false;
 
 async function ensureDevServer(): Promise<boolean> {
@@ -25,7 +26,13 @@ async function ensureDevServer(): Promise<boolean> {
 
     if (!devServer) {
       devServer = new ViteDevServer(vfs, { port: 3000, root: "/sandbox" });
-      serverBridge.registerServer(devServer, 3000);
+      // ViteDevServer satisfies the bridge's runtime contract (handleRequest);
+      // its declared type predates the narrower IVirtualServer interface.
+      type RegisterableServer = Parameters<ServerBridge["registerServer"]>[0];
+      serverBridge.registerServer(devServer as unknown as RegisterableServer, 3000);
+    }
+
+    if (!previewReady) {
       devServer.start();
       previewReady = true;
     }
@@ -178,13 +185,18 @@ export async function runCode(): Promise<void> {
     if (!preview) throw new Error("Preview element not found");
 
     const serverReady = await ensureDevServer();
-    if (serverReady && devServer) {
+    const server = devServer;
+    if (serverReady && server) {
       syncFilesToDevServer(files);
       preview.src = `/__virtual__/3000/`;
       preview.onload = () => {
+        const target = preview.contentWindow;
+        if (!target) return;
         try {
-          devServer.setHMRTarget(preview.contentWindow);
-        } catch {}
+          server.setHMRTarget(target);
+        } catch {
+          // HMR is best-effort; the preview still renders without it
+        }
       };
     } else {
       runBlobFallback(files, preview);
@@ -205,20 +217,43 @@ function syncFilesToDevServer(files: FileTab[]): void {
   for (const file of files) {
     const dir = file.name.substring(0, file.name.lastIndexOf("/"));
     if (dir) {
-      try { vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true }); } catch {}
+      try {
+        vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
+      } catch {
+        // directory already exists
+      }
     }
-    let content = file.content;
-    if (/\.html?$/i.test(file.name) && content.includes("<head")) {
-      const interceptScript = `<script>${consoleInterceptor}${navigationInterceptor}</script>`;
-      content = content.replace(/(<head[^>]*>)/i, `$1\n${interceptScript}`);
+    const content = /\.html?$/i.test(file.name)
+      ? injectInterceptors(file.content)
+      : file.content;
+    try {
+      vfs.writeFileSync(`/sandbox/${file.name}`, content);
+    } catch {
+      // skip unwritable file
     }
-    try { vfs.writeFileSync(`/sandbox/${file.name}`, content); } catch {}
   }
 }
 
-function getPreview(): HTMLIFrameElement | null {
-  const el = document.getElementById("preview");
-  return el instanceof HTMLIFrameElement ? el : null;
+/**
+ * Inject the console/navigation interception script into an HTML document,
+ * whether or not it has a <head>. Documents without a <head> get wrapped in a
+ * minimal skeleton so console capture still works.
+ */
+export function injectInterceptors(html: string): string {
+  const script = `<script>${consoleInterceptor}${navigationInterceptor}</script>`;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${script}`);
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (match) => `${match}\n<head>\n${script}\n</head>`);
+  }
+  return [
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+    script,
+    "</head><body>",
+    html,
+    "</body></html>",
+  ].join("\n");
 }
 
 function inlineCssFiles(files: FileTab[]): string {
@@ -264,26 +299,21 @@ function runBlobFallback(files: FileTab[], preview: HTMLIFrameElement): void {
   preview.src = url;
 }
 
-function injectBlobHtml(html: string, cssLinks: string, jsLinks: string): string {
-  let result = html;
-  const interceptorScript = `<script>${consoleInterceptor}${navigationInterceptor}</script>`;
+function injectBlobHtml(html: string, cssInlined: string, jsInlined: string): string {
+  let result = injectInterceptors(html);
 
-  const headInjection = [interceptorScript, cssLinks].filter(Boolean).join("\n");
-  const bodyInjection = jsLinks;
-
-  result = result.replace(/(<\/head\s*>)/i, `${headInjection}\n$1`);
-  result = result.replace(/(<\/body\s*>)/i, `${bodyInjection}\n$1`);
-
-  if (!/<head/i.test(result)) {
-    result = [
-      '<!DOCTYPE html><html><head><meta charset="UTF-8">',
-      headInjection,
-      "</head><body>",
-      result,
-      bodyInjection,
-      "</body></html>",
-    ].filter(Boolean).join("");
+  if (cssInlined) {
+    result = /<\/head\s*>/i.test(result)
+      ? result.replace(/<\/head\s*>/i, (match) => `${cssInlined}\n${match}`)
+      : `${cssInlined}\n${result}`;
   }
+
+  if (jsInlined) {
+    result = /<\/body\s*>/i.test(result)
+      ? result.replace(/<\/body\s*>/i, (match) => `${jsInlined}\n${match}`)
+      : `${result}\n${jsInlined}`;
+  }
+
   return result;
 }
 

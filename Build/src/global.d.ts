@@ -13,10 +13,22 @@ declare module "wasm-git/lg2_opfs_auto.js" {
     moduleArg?: object;
   }): Promise<OpfsGit>;
 
+  export interface OpfsFileSystem {
+    readdir(path: string): string[];
+    unlink(path: string): void;
+    [key: string]: unknown;
+  }
+
+  export interface OpfsModule {
+    print: (text: string) => void;
+    printErr: (text: string) => void;
+    [key: string]: unknown;
+  }
+
   export class OpfsGit {
     variant: string;
-    FS: any;
-    module: any;
+    FS: OpfsFileSystem;
+    module: OpfsModule;
     repoDir(repoName: string): string;
     init(opts?: { user?: string; email?: string }): Promise<this>;
     syncRepo(repoName: string): Promise<boolean>;

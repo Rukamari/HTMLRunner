@@ -1,4 +1,5 @@
 import { getContainer, isContainerReady } from "./container";
+import { parseCommandLine } from "./utils";
 import {
   gitInit,
   gitClone,
@@ -32,34 +33,6 @@ function write(text: string): void {
 
 function writeln(text: string): void {
   terminalWriteln?.(text);
-}
-
-function parseLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuote: string | null = null;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuote) {
-      if (ch === inQuote) {
-        inQuote = null;
-      } else {
-        current += ch;
-      }
-    } else if (ch === "'" || ch === '"') {
-      inQuote = ch;
-    } else if (ch === " ") {
-      if (current) {
-        result.push(current);
-        current = "";
-      }
-    } else {
-      current += ch;
-    }
-  }
-  if (current) result.push(current);
-  return result;
 }
 
 async function runShellCommand(line: string): Promise<void> {
@@ -192,7 +165,7 @@ export async function executeCommand(line: string): Promise<void> {
   const trimmed = line.trim();
   if (!trimmed) return;
 
-  const parts = parseLine(trimmed);
+  const parts = parseCommandLine(trimmed);
   const cmd = parts[0]?.toLowerCase() ?? "";
   const args = parts.slice(1);
 

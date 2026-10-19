@@ -61,6 +61,8 @@ export const stateHydrated = signal(path("htmlrunner", "meta", "stateHydrated"),
 export const loadingVisible = signal(path("htmlrunner", "ui", "loadingVisible"), false);
 export const errorMessage = signal(path("htmlrunner", "ui", "errorMessage"), "");
 export const errorVisible = signal(path("htmlrunner", "ui", "errorVisible"), false);
+export type ToastKind = "error" | "success" | "info";
+export const toastKind = signal<ToastKind>(path("htmlrunner", "ui", "toastKind"), "error");
 effect(() => errorVisible.set(errorMessage.get().length > 0));
 
 export const themeLabel = signal(path("htmlrunner", "ui", "themeLabel"), darkModeState.get() ? "Light Mode" : "Dark Mode");
@@ -223,17 +225,4 @@ export function loadState(): void {
     showError("Failed to load state: " + msg);
     markStateHydrated();
   }
-}
-
-export function resetCode(skipConfirmation: boolean = false): void {
-  if (skipConfirmation || confirm("Are you sure you want to reset all code?")) {
-    filesState.set(getDefaultFiles());
-    activeFileState.set("index.html");
-    markStateHydrated();
-  }
-}
-
-let nextUntitledId = 1;
-export function getNextUntitledId(): string {
-  return `untitled-${nextUntitledId++}.html`;
 }

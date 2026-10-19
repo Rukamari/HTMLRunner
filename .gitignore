@@ -12,6 +12,7 @@ yarn-error.log*
 dist/
 build/
 out/
+dev-dist/
 
 # TypeScript cache
 *.tsbuildinfo

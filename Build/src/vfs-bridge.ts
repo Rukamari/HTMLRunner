@@ -1,6 +1,5 @@
 import { getVFS } from "./container";
-import { filesState } from "./appState";
-import { syncFileToWorker } from "./git-service";
+import { deleteFileFromWorker, syncFileToWorker } from "./git-service";
 
 let _syncTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -16,12 +15,33 @@ export function initBridge(): void {
 
   vfs.on("delete", (path: string) => {
     if (!path.startsWith("/sandbox/")) return;
-    // Worker handles deletion via git operations
+    const relPath = path.slice("/sandbox/".length);
+    if (!relPath || relPath.includes("node_modules") || relPath.startsWith(".")) return;
+    deleteFileFromWorker(relPath);
   });
+}
+
+/** Write a file into the sandbox VFS (creating parent folders as needed). */
+export function syncFileToVFS(name: string, content: string): void {
+  const vfs = getVFS();
+  const dir = name.substring(0, name.lastIndexOf("/"));
+  if (dir) {
+    try {
+      vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true });
+    } catch {
+      // directory already exists
+    }
+  }
+  try {
+    vfs.writeFileSync(`/sandbox/${name}`, content);
+  } catch {
+    // skip unwritable file
+  }
 }
 
 export function syncFilesToWorker(files: { name: string; content: string }[]): void {
   for (const file of files) {
+    syncFileToVFS(file.name, file.content);
     syncFileToWorker(file.name, file.content);
   }
 }
@@ -36,27 +56,10 @@ export function syncFilesDebounced(
   }, 500);
 }
 
-export function syncActiveFileToVFS(
-  name: string,
-  content: string,
-): void {
-  const vfs = getVFS();
-  const dir = name.substring(0, name.lastIndexOf("/"));
-  if (dir) {
-    try { vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true }); } catch {}
-  }
-  try { vfs.writeFileSync(`/sandbox/${name}`, content); } catch {}
-}
-
 export function syncAllFilesToVFS(
   files: { name: string; content: string }[],
 ): void {
-  const vfs = getVFS();
   for (const file of files) {
-    const dir = file.name.substring(0, file.name.lastIndexOf("/"));
-    if (dir) {
-      try { vfs.mkdirSync(`/sandbox/${dir}`, { recursive: true }); } catch {}
-    }
-    try { vfs.writeFileSync(`/sandbox/${file.name}`, file.content); } catch {}
+    syncFileToVFS(file.name, file.content);
   }
 }
