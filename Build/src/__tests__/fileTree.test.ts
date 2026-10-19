@@ -34,17 +34,24 @@ describe("file tree helpers", () => {
     expect(names(tree)).toEqual(["d:src", "f:index.html"]);
 
     const src = tree[0];
+    if (!src) throw new Error("expected src folder");
     expect(names(src.children)).toEqual([
       "d:components",
       "f:a.js",
       "f:z.js",
     ]);
-    expect(names(src.children[0].children)).toEqual(["f:b.js"]);
+    const components = src.children[0];
+    if (!components) throw new Error("expected components folder");
+    expect(names(components.children)).toEqual(["f:b.js"]);
   });
 
   it("does not duplicate folders for shared prefixes", () => {
     const tree = buildFileTree([file("a/b/c.js"), file("a/b/d.js")]);
     expect(tree).toHaveLength(1);
-    expect(tree[0].children[0].children).toHaveLength(2);
+    const a = tree[0];
+    if (!a) throw new Error("expected a folder");
+    const b = a.children[0];
+    if (!b) throw new Error("expected b folder");
+    expect(b.children).toHaveLength(2);
   });
 });

@@ -1,64 +1,84 @@
 import { effect, path, signal } from "@nisoku/sairin";
-import type { State, Actions, FileTab } from "./types";
+import type { State, Actions, FileTab, LogLevel, OutputType } from "./types";
+import { LOG_LEVELS } from "./types";
 import { getDefaultFiles } from "./defaultContent";
+import { parseStateSnapshot } from "./stateSchema";
 import { showError } from "./ui";
 
 const STORAGE_KEY = "htmlRunnerState";
 
-function readPersistedState(): Partial<State> | null {
+function readPersistedState(): Partial<State> {
   try {
     const savedState = localStorage.getItem(STORAGE_KEY);
-    if (!savedState) return null;
-    return JSON.parse(savedState) as Partial<State>;
+    return savedState ? parseStateSnapshot(JSON.parse(savedState)) : {};
   } catch {
-    return null;
+    return {};
   }
 }
 
 const persistedState = readPersistedState();
-
 const defaultFiles = getDefaultFiles();
 
-const filesInitial: FileTab[] = Array.isArray(persistedState?.files) && persistedState!.files.length > 0
-  ? persistedState!.files
-  : defaultFiles;
+const filesInitial =
+  persistedState.files && persistedState.files.length > 0
+    ? persistedState.files
+    : defaultFiles;
 
-const activeFileInitial: string = typeof persistedState?.activeFile === "string" &&
-  filesInitial.some((f) => f.id === persistedState!.activeFile)
-  ? persistedState!.activeFile
-  : filesInitial[0]?.id ?? "index.html";
+const activeFileInitial: string =
+  typeof persistedState.activeFile === "string" &&
+  filesInitial.some((f) => f.id === persistedState.activeFile)
+    ? persistedState.activeFile
+    : filesInitial[0]?.id ?? "index.html";
 
 const darkModeInitial =
-  persistedState?.darkMode ?? localStorage.getItem("darkMode") === "true";
+  persistedState.darkMode ?? localStorage.getItem("darkMode") === "true";
 const autoRunInitial =
-  persistedState?.autoRun ?? localStorage.getItem("autoRun") === "true";
-const activeOutputInitial = persistedState?.activeOutput ?? "preview";
-const splitSizesInitial: number[] =
-  Array.isArray(persistedState?.splitSizes) &&
-  persistedState!.splitSizes.length === 2
-    ? persistedState!.splitSizes
-    : [50, 50];
-
-const logFiltersInitial = Array.isArray(persistedState?.logFilters)
-  ? (persistedState!.logFilters as string[])
-  : ["log", "error", "warn", "info"];
-
-const ALLOWED_OUTPUTS = ["preview", "console", "terminal"] as const;
+  persistedState.autoRun ?? localStorage.getItem("autoRun") === "true";
+const activeOutputInitial: OutputType = persistedState.activeOutput ?? "preview";
+const splitSizesInitial: number[] = persistedState.splitSizes ?? [50, 50];
+const logFiltersInitial: LogLevel[] = persistedState.logFilters ?? [...LOG_LEVELS];
 
 let _lastPersistedSnapshot = "";
 let _idleHandle: number | null = null;
 let _timeoutHandle: number | null = null;
 
-export const filesState = signal(path("htmlrunner", "editor", "files"), filesInitial);
-export const activeFileState = signal(path("htmlrunner", "editor", "activeFile"), activeFileInitial);
-export const activeOutputState = signal(path("htmlrunner", "ui", "activeOutput"), activeOutputInitial);
-export const splitSizesState = signal(path("htmlrunner", "layout", "splitSizes"), splitSizesInitial);
-export const darkModeState = signal(path("htmlrunner", "ui", "darkMode"), darkModeInitial);
-export const autoRunState = signal(path("htmlrunner", "editor", "autoRun"), autoRunInitial);
-export const logFilters = signal(path("htmlrunner", "console", "filters"), logFiltersInitial);
-export const stateHydrated = signal(path("htmlrunner", "meta", "stateHydrated"), false);
+export const filesState = signal<FileTab[]>(
+  path("htmlrunner", "editor", "files"),
+  filesInitial,
+);
+export const activeFileState = signal(
+  path("htmlrunner", "editor", "activeFile"),
+  activeFileInitial,
+);
+export const activeOutputState = signal<OutputType>(
+  path("htmlrunner", "ui", "activeOutput"),
+  activeOutputInitial,
+);
+export const splitSizesState = signal(
+  path("htmlrunner", "layout", "splitSizes"),
+  splitSizesInitial,
+);
+export const darkModeState = signal(
+  path("htmlrunner", "ui", "darkMode"),
+  darkModeInitial,
+);
+export const autoRunState = signal(
+  path("htmlrunner", "editor", "autoRun"),
+  autoRunInitial,
+);
+export const logFilters = signal<LogLevel[]>(
+  path("htmlrunner", "console", "filters"),
+  logFiltersInitial,
+);
+export const stateHydrated = signal(
+  path("htmlrunner", "meta", "stateHydrated"),
+  false,
+);
 
-export const loadingVisible = signal(path("htmlrunner", "ui", "loadingVisible"), false);
+export const loadingVisible = signal(
+  path("htmlrunner", "ui", "loadingVisible"),
+  false,
+);
 export const errorMessage = signal(path("htmlrunner", "ui", "errorMessage"), "");
 export const errorVisible = signal(path("htmlrunner", "ui", "errorVisible"), false);
 export type ToastKind = "error" | "success" | "info";
@@ -95,7 +115,10 @@ effect(() => {
   bodyClass.set(parts.join(" "));
 });
 
-export const globalActions = signal(path("htmlrunner", "global", "actions"), {} as Actions);
+export const globalActions = signal<Partial<Actions>>(
+  path("htmlrunner", "global", "actions"),
+  {},
+);
 
 export const cursorPos = signal(path("htmlrunner", "ui", "cursorPos"), { line: 1, col: 1 });
 
@@ -165,44 +188,35 @@ export function createStateSnapshot(): State {
 }
 
 export function applyStateSnapshot(snapshot: Partial<State>): void {
-  if (Array.isArray(snapshot.files) && snapshot.files.length > 0) {
-    const validFiles = snapshot.files.filter(
-      (f) => typeof f.id === "string" && typeof f.name === "string" && typeof f.content === "string",
-    );
-    if (validFiles.length > 0) {
-      filesState.set(validFiles);
-      if (typeof snapshot.activeFile === "string" && validFiles.some((f) => f.id === snapshot.activeFile)) {
-        activeFileState.set(snapshot.activeFile);
-      } else {
-        activeFileState.set(validFiles[0].id);
-      }
-    }
+  const files = snapshot.files;
+  if (files && files.length > 0) {
+    filesState.set(files);
+    const requestedActive = snapshot.activeFile;
+    const nextActive =
+      requestedActive && files.some((f) => f.id === requestedActive)
+        ? requestedActive
+        : files[0]?.id;
+    if (nextActive) activeFileState.set(nextActive);
   }
 
-  if (typeof snapshot.activeOutput === "string") {
-    if ((ALLOWED_OUTPUTS as readonly string[]).includes(snapshot.activeOutput)) {
-      activeOutputState.set(snapshot.activeOutput);
-    }
+  if (snapshot.activeOutput) {
+    activeOutputState.set(snapshot.activeOutput);
   }
 
-  if (
-    Array.isArray(snapshot.splitSizes) &&
-    snapshot.splitSizes.length === 2 &&
-    snapshot.splitSizes.every((size) => typeof size === "number")
-  ) {
+  if (snapshot.splitSizes) {
     splitSizesState.set(snapshot.splitSizes);
   }
 
-  if (typeof snapshot.darkMode === "boolean") {
+  if (snapshot.darkMode !== undefined) {
     darkModeState.set(snapshot.darkMode);
   }
 
-  if (typeof snapshot.autoRun === "boolean") {
+  if (snapshot.autoRun !== undefined) {
     autoRunState.set(snapshot.autoRun);
   }
 
-  if (Array.isArray(snapshot.logFilters)) {
-    logFilters.set(snapshot.logFilters as string[]);
+  if (snapshot.logFilters) {
+    logFilters.set(snapshot.logFilters);
   }
 }
 
@@ -214,12 +228,9 @@ export function loadState(): void {
   try {
     const savedState = localStorage.getItem(STORAGE_KEY);
     if (savedState) {
-      const parsed = JSON.parse(savedState) as Partial<State>;
-      applyStateSnapshot(parsed);
-      markStateHydrated();
-    } else {
-      markStateHydrated();
+      applyStateSnapshot(parseStateSnapshot(JSON.parse(savedState)));
     }
+    markStateHydrated();
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     showError("Failed to load state: " + msg);

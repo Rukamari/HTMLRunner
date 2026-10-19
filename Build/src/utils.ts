@@ -1,19 +1,11 @@
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  func: T,
+export function debounce<Args extends unknown[]>(
+  func: (...args: Args) => unknown,
   wait: number,
-): (...args: Parameters<T>) => void {
+): (...args: Args) => void {
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  return function (this: unknown, ...args: Parameters<T>): void {
+  return function (this: unknown, ...args: Args): void {
     if (timeout !== undefined) clearTimeout(timeout);
-    timeout = setTimeout(
-      () =>
-        Reflect.apply(
-          func as unknown as (...a: unknown[]) => unknown,
-          this,
-          args as unknown[],
-        ),
-      wait,
-    );
+    timeout = setTimeout(() => Reflect.apply(func, this, args), wait);
   };
 }
 
@@ -22,8 +14,7 @@ export function parseCommandLine(line: string): string[] {
   let current = "";
   let inQuote: string | null = null;
 
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+  for (const ch of line) {
     if (inQuote) {
       if (ch === inQuote) {
         inQuote = null;

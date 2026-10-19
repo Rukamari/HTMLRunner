@@ -32,7 +32,7 @@ export function renderFileTabs(
 
     const tab = document.createElement("div");
     tab.className = `file-tab${file.id === activeId ? " active" : ""}`;
-    tab.dataset.file = file.id;
+    tab.dataset["file"] = file.id;
 
     const nameSpan = document.createElement("span");
     nameSpan.className = "file-tab-name";
@@ -42,7 +42,7 @@ export function renderFileTabs(
     const closeBtn = document.createElement("button");
     closeBtn.className = "file-tab-close";
     closeBtn.innerHTML = "&times;";
-    closeBtn.dataset.file = file.id;
+    closeBtn.dataset["file"] = file.id;
     tab.appendChild(closeBtn);
 
     container.appendChild(tab);
@@ -66,7 +66,7 @@ export function renderTreeNode(
 
   if (node.isFile) {
     item.className = `file-tree-item${node.file && node.file.id === activeId ? " active" : ""}`;
-    item.dataset.file = node.file?.id;
+    item.dataset["file"] = node.file?.id;
 
     const icon = document.createElement("i");
     const fileName = node.file?.name ?? node.name;
@@ -80,7 +80,7 @@ export function renderTreeNode(
   } else {
     const isOpen = expandedFolders.has(node.path);
     item.className = "file-tree-folder";
-    item.dataset.folder = node.path;
+    item.dataset["folder"] = node.path;
 
     const toggle = document.createElement("span");
     toggle.className = "file-tree-toggle";

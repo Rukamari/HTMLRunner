@@ -39,6 +39,7 @@ export function buildFileTree(files: FileTab[]): TreeNode[] {
     for (let i = 0; i < parts.length; i++) {
       const isFile = i === parts.length - 1;
       const part = parts[i];
+      if (!part) continue;
       const fullPath = parts.slice(0, i + 1).join("/");
 
       let existing = current.find((n) => n.name === part);

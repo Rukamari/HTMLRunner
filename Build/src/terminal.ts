@@ -65,16 +65,15 @@ export function createTerminal(el: HTMLElement): void {
 
   term.onKey((e) => {
     const { key, domEvent } = e;
-    const ev = domEvent as KeyboardEvent;
 
-    if (ev.ctrlKey && key === "c") {
+    if (domEvent.ctrlKey && key === "c") {
       term?.write("^C\r\n$ ");
       lineBuffer = "";
       historyIndex = -1;
       return;
     }
 
-    if (ev.ctrlKey && key === "l") {
+    if (domEvent.ctrlKey && key === "l") {
       term?.write("\x1b[2J\x1b[H$ ");
       lineBuffer = "";
       return;
@@ -101,10 +100,13 @@ export function createTerminal(el: HTMLElement): void {
     } else if (key === "\x1b[A") {
       if (history.length > 0) {
         const idx = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
-        historyIndex = idx;
-        clearLine();
-        lineBuffer = history[idx];
-        term?.write(lineBuffer);
+        const entry = history[idx];
+        if (entry !== undefined) {
+          historyIndex = idx;
+          clearLine();
+          lineBuffer = entry;
+          term?.write(entry);
+        }
       }
     } else if (key === "\x1b[B") {
       if (historyIndex >= 0) {
@@ -114,21 +116,24 @@ export function createTerminal(el: HTMLElement): void {
           clearLine();
           lineBuffer = "";
         } else {
-          historyIndex = idx;
-          clearLine();
-          lineBuffer = history[idx];
-          term?.write(lineBuffer);
+          const entry = history[idx];
+          if (entry !== undefined) {
+            historyIndex = idx;
+            clearLine();
+            lineBuffer = entry;
+            term?.write(entry);
+          }
         }
       }
     } else if (key === "\x1b[C") {
       // Right arrow - ignore
     } else if (key === "\x1b[D") {
       // Left arrow - ignore
-    } else if (ev.ctrlKey && key === "a") {
+    } else if (domEvent.ctrlKey && key === "a") {
       // Home - ignore (no cursor movement support)
-    } else if (ev.ctrlKey && key === "e") {
+    } else if (domEvent.ctrlKey && key === "e") {
       // End - ignore
-    } else if (key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+    } else if (key.length === 1 && !domEvent.ctrlKey && !domEvent.altKey && !domEvent.metaKey) {
       lineBuffer += key;
       term?.write(key);
     }

@@ -18,6 +18,7 @@ import {
 } from "./fileActions";
 import { copyAllConsole, copyEditorContent, toggleSearch } from "./bindings";
 import { switchOutput, toggleAutoRun, toggleDarkMode } from "./ui";
+import type { Actions } from "./types";
 
 export function undoAction(): void {
   if (editor.view) cmUndo(editor.view);
@@ -48,7 +49,7 @@ export const actions = {
   toggleSearch,
   toggleAutoRun,
   toggleDarkMode,
-};
+} satisfies Actions;
 
 export function registerGlobalActions(): void {
   globalActions.set({

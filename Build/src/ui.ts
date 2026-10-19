@@ -7,6 +7,7 @@ import {
   toastKind,
   type ToastKind,
 } from "./appState";
+import type { OutputType } from "./types";
 import { setAutoRun, setDarkMode } from "./editor";
 
 const TOAST_DURATION_MS = 5000;
@@ -48,7 +49,7 @@ export function showInfo(message: string): void {
   showToast(message, "info");
 }
 
-export function switchOutput(output: string): void {
+export function switchOutput(output: OutputType): void {
   activeOutputState.set(output);
 }
 

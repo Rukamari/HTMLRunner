@@ -19,7 +19,7 @@ function vfsReadFile(path: string): string | null {
   if (!isContainerReady()) return null;
   const vfs = getVFS();
   try {
-    return vfs.readFileSync(path, "utf-8") as string;
+    return vfs.readFileSync(path, "utf-8");
   } catch {
     return null;
   }
@@ -38,7 +38,7 @@ function vfsStat(path: string): boolean {
 
 export async function esbuildBundle(
   cwd: string,
-  write: (text: string) => void,
+  _write: (text: string) => void,
   writeln: (text: string) => void,
 ): Promise<void> {
   try {

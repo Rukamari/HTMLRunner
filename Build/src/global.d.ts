@@ -35,7 +35,7 @@ declare module "wasm-git/lg2_opfs_auto.js" {
     run(args: string[]): Promise<void>;
     clone(url: string, repoName: string): Promise<string[]>;
     writeFile(repoName: string, filename: string, contents: string): Promise<void>;
-    readFile(repoName: string, filename: string, encoding?: string): string;
+    readFile(repoName: string, filename: string, encoding?: string): string | Uint8Array;
     readdir(repoName: string): string[];
     addCommitPush(repoName: string, filename: string, message?: string): Promise<string[]>;
     removeRepo(repoName: string): Promise<void>;

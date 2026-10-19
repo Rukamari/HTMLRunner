@@ -8,6 +8,8 @@ import { copyToClipboard } from "./utils";
 import { consoleEntries } from "./console";
 import { editor } from "./editor";
 import { logFilters } from "./appState";
+import { LOG_LEVELS, isLogLevel, type LogLevel } from "./types";
+import { queryOne } from "./dom";
 
 export function toggleSearch(mode: "find" | "replace" = "find"): void {
   if (!editor.view) return;
@@ -19,12 +21,12 @@ export function toggleSearch(mode: "find" | "replace" = "find"): void {
   }
 
   window.requestAnimationFrame(() => {
+    if (!editor.view) return;
     const selector =
       mode === "replace"
         ? '.cm-search input[name="replace"]'
         : '.cm-search input[name="search"]';
-    const root = editor.view!.dom as HTMLElement;
-    const field = root.querySelector(selector) as HTMLInputElement | null;
+    const field = queryOne(selector, HTMLInputElement, editor.view.dom);
     field?.focus();
     field?.select();
   });
@@ -104,17 +106,17 @@ export function initializeLogFilters(outputTabsEl?: Element | null): void {
   const filtersDiv = document.createElement("div");
   filtersDiv.className = "console-filters";
 
-  (["log", "error", "warn", "info"] as const).forEach((type) => {
+  const filterIcons: Record<LogLevel, string> = {
+    log: "terminal",
+    error: "times-circle",
+    warn: "exclamation-triangle",
+    info: "info-circle",
+  };
+
+  for (const type of LOG_LEVELS) {
     const button = document.createElement("button");
     button.className = `filter-toggle ${type}`;
-    const icon =
-      type === "log"
-        ? "terminal"
-        : type === "error"
-          ? "times-circle"
-          : type === "warn"
-            ? "exclamation-triangle"
-            : "info-circle";
+    const icon = filterIcons[type];
     button.innerHTML = `<i class="fas fa-${icon}"></i>${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
     bindEvent(button, "click", () => {
@@ -126,16 +128,16 @@ export function initializeLogFilters(outputTabsEl?: Element | null): void {
     });
 
     filtersDiv.appendChild(button);
-  });
+  }
 
   consoleTab.insertBefore(filtersDiv, consoleTab.lastElementChild);
 
-  const btnMap = new Map<string, HTMLButtonElement>();
+  const btnMap = new Map<LogLevel, HTMLButtonElement>();
   Array.from(filtersDiv.children).forEach((c) => {
     if (c instanceof HTMLButtonElement) {
       const classes = c.className.split(" ");
       for (const cls of classes) {
-        if (["log", "error", "warn", "info"].includes(cls)) {
+        if (isLogLevel(cls)) {
           btnMap.set(cls, c);
           break;
         }

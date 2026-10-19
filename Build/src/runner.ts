@@ -3,6 +3,7 @@ import { showLoading, showError, hideLoading, switchOutput } from "./ui";
 import { clearConsole, logConsoleError } from "./console";
 import { filesState, activeFileState } from "./appState";
 import { getVFS, isContainerReady } from "./container";
+import { getById } from "./dom";
 import { marked } from "marked";
 import type { ViteDevServer, ServerBridge } from "almostnode";
 import type { FileTab } from "./types";
@@ -25,11 +26,30 @@ async function ensureDevServer(): Promise<boolean> {
     }
 
     if (!devServer) {
-      devServer = new ViteDevServer(vfs, { port: 3000, root: "/sandbox" });
-      // ViteDevServer satisfies the bridge's runtime contract (handleRequest);
-      // its declared type predates the narrower IVirtualServer interface.
-      type RegisterableServer = Parameters<ServerBridge["registerServer"]>[0];
-      serverBridge.registerServer(devServer as unknown as RegisterableServer, 3000);
+      const server = new ViteDevServer(vfs, { port: 3000, root: "/sandbox" });
+      devServer = server;
+      // Adapt DevServer's `isRunning`/port API to the bridge's IVirtualServer
+      // contract explicitly instead of asserting through `unknown`.
+      serverBridge.registerServer(
+        {
+          get listening() {
+            return server.isRunning();
+          },
+          address: () => ({
+            port: server.getPort(),
+            address: "0.0.0.0",
+            family: "IPv4",
+          }),
+          handleRequest: (method, url, headers, body) =>
+            server.handleRequest(
+              method,
+              url,
+              headers,
+              typeof body === "string" ? undefined : body,
+            ),
+        },
+        3000,
+      );
     }
 
     if (!previewReady) {
@@ -73,13 +93,13 @@ marked.use({
 });
 
 export function renderMarkdownPreview(md: string): string {
-  return `<div class="md-preview">${marked.parse(md) as string}</div>`;
+  return `<div class="md-preview">${marked.parse(md, { async: false })}</div>`;
 }
 
 let prevMdBlobUrl: string | null = null;
 
 function renderMarkdownInPreview(md: string): void {
-  const preview = document.getElementById("preview") as HTMLIFrameElement | null;
+  const preview = getById("preview", HTMLIFrameElement);
   if (!preview) return;
   const isDark = document.body.classList.contains("dark-mode");
   const css = isDark
@@ -124,6 +144,13 @@ type PrettierBundle = {
 };
 
 let prettierBundlePromise: Promise<PrettierBundle> | undefined;
+
+type ModuleWithDefault<T> = T & { default?: T };
+
+/** Vite wraps some CommonJS Prettier plugins in a `default` export. */
+function moduleDefault<T>(module: ModuleWithDefault<T>): T {
+  return module.default ?? module;
+}
 
 async function loadPrettierBundle(): Promise<PrettierBundle> {
   if (!prettierBundlePromise) {
@@ -181,7 +208,7 @@ export async function runCode(): Promise<void> {
       return;
     }
 
-    const preview = document.getElementById("preview") as HTMLIFrameElement | null;
+    const preview = getById("preview", HTMLIFrameElement);
     if (!preview) throw new Error("Preview element not found");
 
     const serverReady = await ensureDevServer();
@@ -327,15 +354,10 @@ export async function formatCode(): Promise<void> {
       prettierPluginEstree,
     } = await loadPrettierBundle();
 
-    const pHtml =
-      (parserHtml as unknown as { default?: unknown }).default || parserHtml;
-    const pCss =
-      (parserCss as unknown as { default?: unknown }).default || parserCss;
-    const pBabel =
-      (parserBabel as unknown as { default?: unknown }).default || parserBabel;
-    const pEstree =
-      (prettierPluginEstree as unknown as { default?: unknown }).default ||
-      prettierPluginEstree;
+    const pHtml = moduleDefault(parserHtml);
+    const pCss = moduleDefault(parserCss);
+    const pBabel = moduleDefault(parserBabel);
+    const pEstree = moduleDefault(prettierPluginEstree);
 
     const files = filesState.get();
 
@@ -400,11 +422,12 @@ export async function formatCode(): Promise<void> {
       }
     };
 
-    const formatted = await Promise.all(files.map(formatFile));
-    const updated = files.map((f, i) => ({
-      ...f,
-      content: formatted[i],
-    }));
+    const updated = await Promise.all(
+      files.map(async (file) => ({
+        ...file,
+        content: await formatFile(file),
+      })),
+    );
     filesState.set(updated);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

@@ -217,17 +217,19 @@ export function duplicateFileAction(id: string): void {
 export function closeOthersAction(id: string): void {
   const files = filesState.get();
   const kept = files.filter((f) => f.id === id);
-  if (kept.length === 0) return;
+  const keptFile = kept[0];
+  if (!keptFile) return;
   const removed = files.filter((f) => f.id !== id);
   filesState.set(kept);
-  switchToFile(kept[0]);
+  switchToFile(keptFile);
   deleteFiles(removed.map((f) => f.id));
 }
 
 export function closeAllAction(): void {
   const files = filesState.get();
-  if (files.length === 0) return;
-  const [kept, ...removed] = files;
+  const kept = files[0];
+  if (!kept) return;
+  const removed = files.slice(1);
   filesState.set([kept]);
   switchToFile(kept);
   deleteFiles(removed.map((f) => f.id));
@@ -247,8 +249,9 @@ export function deleteFolderAction(folderPath: string): void {
 
   const activeId = activeFileState.get();
   if (!updated.find((f) => f.id === activeId)) {
-    if (updated.length > 0) {
-      switchToFile(updated[0]);
+    const next = updated[0];
+    if (next) {
+      switchToFile(next);
     } else {
       // Never leave the editor with zero files.
       const fallback = createFile("untitled.html", getTemplateForExt("html"));
@@ -272,8 +275,7 @@ export function importFilesAction(): void {
     if (!fileList || fileList.length === 0) return;
     const newTabs: FileTab[] = [];
     let currentFiles = filesState.get();
-    for (let i = 0; i < fileList.length; i++) {
-      const f = fileList[i];
+    for (const f of Array.from(fileList)) {
       const content = await f.text();
       const fileName = uniqueFileName(currentFiles, f.name);
       const tab = createFile(fileName, content);
@@ -282,7 +284,10 @@ export function importFilesAction(): void {
     }
     if (newTabs.length > 0) {
       filesState.set(currentFiles);
-      const file = currentFiles.find((f) => f.id === newTabs[0].id);
+      const firstTab = newTabs[0];
+      const file = firstTab
+        ? currentFiles.find((f) => f.id === firstTab.id)
+        : undefined;
       if (file) switchToFile(file);
       for (const tab of newTabs) {
         syncFileToWorker(tab.name, tab.content);
@@ -302,9 +307,11 @@ export async function exportAsZip(): Promise<void> {
   }
 
   if (nonEmpty.length === 1) {
+    const single = nonEmpty[0];
+    if (!single) return;
     try {
-      const blob = new Blob([nonEmpty[0].content], { type: "text/plain" });
-      saveAs(blob, nonEmpty[0].name);
+      const blob = new Blob([single.content], { type: "text/plain" });
+      saveAs(blob, single.name);
     } catch (err) {
       console.error("Failed to export file:", err);
       showError("Unable to export file.");
@@ -352,7 +359,8 @@ function showContextMenu(e: MouseEvent, items: ContextMenuItem[]): void {
   }
 
   const closeMenu = (ev: MouseEvent) => {
-    if (!menu.contains(ev.target as Node)) {
+    const target = ev.target;
+    if (!(target instanceof Node) || !menu.contains(target)) {
       menu.remove();
       document.removeEventListener("click", closeMenu);
     }

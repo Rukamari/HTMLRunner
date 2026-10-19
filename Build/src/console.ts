@@ -1,7 +1,13 @@
-import { ConsoleMessage, StackInfo, ConsoleData } from "./types";
+import type {
+  ConsoleMessage,
+  LogLevel,
+  StackInfo,
+} from "./types";
+import { isConsoleMessage, isRecord } from "./types";
 import { editor } from "./editor";
 import { signal, effect, path } from "@nisoku/sairin";
 import { logFilters } from "./appState";
+import { getById } from "./dom";
 
 // Signal holding the console messages for reactive rendering
 export const consoleEntries = signal(
@@ -26,7 +32,7 @@ let consoleOutputEl: HTMLDivElement | null = null;
 
 function renderConsoleEntries(
   entries: ConsoleMessage[],
-  filters: string[] = logFilters.get(),
+  filters: LogLevel[] = logFilters.get(),
 ): void {
   if (!consoleOutputEl) return;
   const activeFilters = new Set(filters);
@@ -42,28 +48,20 @@ function renderConsoleEntries(
 
     const message = document.createElement("span");
     message.className = `console-${ev.level}`;
-    if (ev.data && ev.data.length) {
-      ev.data.forEach((item: ConsoleData, i: number) => {
-        if (i > 0) message.appendChild(document.createTextNode(" "));
-        if (item && typeof item === "object") {
-          message.appendChild(renderObject(item));
-        } else {
-          message.appendChild(document.createTextNode(String(item)));
-        }
-      });
-    }
+    ev.data.forEach((item, i) => {
+      if (i > 0) message.appendChild(document.createTextNode(" "));
+      if (item && typeof item === "object") {
+        message.appendChild(renderObject(item));
+      } else {
+        message.appendChild(document.createTextNode(String(item)));
+      }
+    });
 
     const maybeStack = ev.data.length > 1 ? ev.data[1] : undefined;
-    if (
-      maybeStack &&
-      typeof maybeStack === "object" &&
-      "stack" in (maybeStack as Record<string, unknown>)
-    ) {
+    if (isRecord(maybeStack) && typeof maybeStack["stack"] === "string") {
       const stack = document.createElement("div");
       stack.className = "console-stack";
-      const stackVal = (maybeStack as Record<string, unknown>)["stack"];
-      const rawStack: string =
-        typeof stackVal === "string" ? stackVal : String(stackVal);
+      const rawStack = maybeStack["stack"];
       rawStack.split("\n").forEach((line) => {
         const lineEl = document.createElement("div");
         lineEl.className = "console-stack-line";
@@ -78,24 +76,26 @@ function renderConsoleEntries(
         ];
         for (const pat of patterns) {
           const m = line.match(pat);
-          if (m) {
-            lineNum = parseInt(m[2], 10);
-            if (m[3]) colNum = parseInt(m[3], 10);
-            break;
-          }
+          const lineText = m?.[2];
+          if (!lineText) continue;
+          lineNum = parseInt(lineText, 10);
+          const colText = m?.[3];
+          if (colText) colNum = parseInt(colText, 10);
+          break;
         }
 
-        if (lineNum) {
+        const targetLine = lineNum;
+        if (targetLine !== undefined) {
           lineEl.classList.add("clickable");
           lineEl.addEventListener("click", () => {
             if (!editor.view) return;
             const doc = editor.view.state.doc;
             const maxLine = doc.lines;
-            const safeLine = Math.max(1, Math.min(lineNum as number, maxLine));
+            const safeLine = Math.max(1, Math.min(targetLine, maxLine));
             const lineObj = doc.line(safeLine);
             const offset = Math.min(
               lineObj.to,
-              lineObj.from + Math.max(0, (colNum || 1) - 1),
+              lineObj.from + Math.max(0, (colNum ?? 1) - 1),
             );
             editor.view.dispatch({ selection: { anchor: offset } });
             editor.view.focus();
@@ -154,19 +154,20 @@ document.addEventListener('click', function(e) {
 // Initialize console message handler
 export function initializeConsole(): void {
   // Cache the console output element now that DOM is ready
-  consoleOutputEl = document.getElementById("console") as HTMLDivElement | null;
+  consoleOutputEl = getById("console", HTMLDivElement);
   // render any existing entries immediately
   if (consoleOutputEl) renderConsoleEntries(consoleEntries.get());
   window.addEventListener("message", handleConsoleMessage);
 }
-function handleConsoleMessage(event: MessageEvent<ConsoleMessage>): void {
+
+function handleConsoleMessage(event: MessageEvent<unknown>): void {
   if (event.origin !== location.origin) return;
-  if (event.data?.type !== "console") return;
+  if (!isConsoleMessage(event.data)) return;
   pushConsoleEntry(event.data);
 }
 
 function renderObject(
-  obj: ConsoleData,
+  obj: unknown,
   level = 0,
   visited = new WeakSet<object>(),
 ): Node {
@@ -175,49 +176,48 @@ function renderObject(
     typeof obj === "string" ||
     typeof obj === "number" ||
     typeof obj === "boolean"
-  )
+  ) {
     return document.createTextNode(String(obj));
+  }
   if (obj instanceof Error) {
     const errorEl = document.createElement("span");
     errorEl.className = "console-error";
     errorEl.textContent = `${obj.name}: ${obj.message}`;
-    if ((obj as Error).stack)
-      errorEl.textContent += `\n${(obj as Error).stack!.split("\n").slice(1).join("\n")}`;
+    if (obj.stack) {
+      errorEl.textContent += `\n${obj.stack.split("\n").slice(1).join("\n")}`;
+    }
     const container = document.createElement("span");
     container.appendChild(errorEl);
     return container;
   }
-  // At this point obj is either an array-like or object with console-able entries
-  const asObj = obj as Record<string, ConsoleData> | ConsoleData[];
-  if (visited.has(asObj as object))
-    return document.createTextNode("[Circular]");
+  if (typeof obj !== "object") {
+    return document.createTextNode(String(obj));
+  }
+  if (visited.has(obj)) return document.createTextNode("[Circular]");
   if (level > 3) return document.createTextNode("[...]");
-  visited.add(asObj as object);
+  visited.add(obj);
 
   const container = document.createElement("span");
   const preview = document.createElement("span");
   preview.className = "console-object";
-  preview.textContent = Array.isArray(asObj)
-    ? `Array(${(asObj as ConsoleData[]).length})`
-    : "{...}";
+  const isArray = Array.isArray(obj);
+  preview.textContent = isArray ? `Array(${obj.length})` : "{...}";
   const content = document.createElement("div");
   content.className = "console-object-content";
 
-  if (Array.isArray(asObj)) {
-    asObj.forEach((v: ConsoleData) => {
+  if (isArray) {
+    obj.forEach((value: unknown) => {
       const prop = document.createElement("div");
-      prop.appendChild(renderObject(v, level + 1, visited));
+      prop.appendChild(renderObject(value, level + 1, visited));
       content.appendChild(prop);
     });
   } else {
-    Object.entries(asObj as Record<string, ConsoleData>).forEach(
-      ([key, value]) => {
-        const prop = document.createElement("div");
-        prop.textContent = `${key}: `;
-        prop.appendChild(renderObject(value, level + 1, visited));
-        content.appendChild(prop);
-      },
-    );
+    Object.entries(obj).forEach(([key, value]) => {
+      const prop = document.createElement("div");
+      prop.textContent = `${key}: `;
+      prop.appendChild(renderObject(value, level + 1, visited));
+      content.appendChild(prop);
+    });
   }
 
   preview.addEventListener("click", (e) => {

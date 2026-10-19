@@ -3,15 +3,7 @@ import { filesState, activeFileState } from "./appState";
 import { getVFS } from "./container";
 import { getLanguageForExt } from "./defaultContent";
 import type { FileTab } from "./types";
-
-interface GitWorkerAPI {
-  init(user?: string, email?: string): Promise<{ variant: string; files: { path: string; content: string }[] }>;
-  writeFile(filePath: string, content: string): Promise<void>;
-  deleteFile(filePath: string): Promise<void>;
-  gitCommand(command: string, args: string[]): Promise<{ stdout: string; files?: { path: string; content: string }[] }>;
-  readFiles(): Promise<{ path: string; content: string }[]>;
-  sync(): Promise<void>;
-}
+import type { GitFile, GitWorkerAPI } from "./gitWorkerTypes";
 
 let api: Remote<GitWorkerAPI> | null = null;
 let _ready = false;
@@ -43,9 +35,7 @@ export function initGitService(worker: Worker): void {
     });
 }
 
-function loadFilesFromWorker(
-  files: { path: string; content: string }[],
-): void {
+function loadFilesFromWorker(files: GitFile[]): void {
   const vfs = getVFS();
   const tabs: FileTab[] = [];
 
@@ -83,8 +73,9 @@ function loadFilesFromWorker(
   if (tabs.length > 0) {
     filesState.set(tabs);
     const currentActive = activeFileState.get();
-    if (!tabs.find((f) => f.id === currentActive)) {
-      activeFileState.set(tabs[0].id);
+    const firstTab = tabs[0];
+    if (firstTab && !tabs.find((f) => f.id === currentActive)) {
+      activeFileState.set(firstTab.id);
     }
   }
 }
@@ -163,10 +154,13 @@ export function deleteFileFromWorker(filePath: string): void {
 }
 
 export async function syncAllFilesToWorker(): Promise<void> {
-  if (!api) return;
+  const currentApi = api;
+  if (!currentApi) return;
   const files = filesState.get();
   await Promise.all(
-    files.map((file) => api!.writeFile(file.name, file.content).catch(() => {})),
+    files.map((file) =>
+      currentApi.writeFile(file.name, file.content).catch(() => {}),
+    ),
   );
 }
 

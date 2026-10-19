@@ -1,5 +1,6 @@
 import { expose } from "comlink";
 import type { OpfsGit } from "wasm-git/lg2_opfs_auto.js";
+import type { GitFile, GitWorkerAPI } from "./gitWorkerTypes";
 
 let git: OpfsGit | null = null;
 const REPO_NAME = "sandbox";
@@ -73,10 +74,10 @@ function isDirectory(path: string): boolean {
  * Skips git internals, node_modules and binary assets that can't be usefully
  * represented in the editor.
  */
-function readAllFiles(): { path: string; content: string }[] {
+function readAllFiles(): GitFile[] {
   if (!git) return [];
   const root = git.repoDir(REPO_NAME);
-  const results: { path: string; content: string }[] = [];
+  const results: GitFile[] = [];
 
   const walk = (dir: string, prefix: string): void => {
     let entries: string[];
@@ -96,10 +97,10 @@ function readAllFiles(): { path: string; content: string }[] {
       const ext = name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
       if (SKIP_EXTS.has(ext)) continue;
       try {
-        const content: unknown = git!.readFile(REPO_NAME, rel);
+        const content = git!.readFile(REPO_NAME, rel);
         if (typeof content === "string") {
           results.push({ path: rel, content });
-        } else if (content instanceof Uint8Array) {
+        } else {
           results.push({ path: rel, content: new TextDecoder().decode(content) });
         }
       } catch {
@@ -112,14 +113,14 @@ function readAllFiles(): { path: string; content: string }[] {
   return results;
 }
 
-const api = {
+const api: GitWorkerAPI = {
   async init(user = "HTMLRunner", email = "runner@htmlrunner.app") {
     return queue(async () => {
       const { loadOpfsGit } = await import("wasm-git/lg2_opfs_auto.js");
       git = await loadOpfsGit({ user, email });
 
       const found = await git.syncRepo(REPO_NAME);
-      let files: { path: string; content: string }[] = [];
+      let files: GitFile[] = [];
 
       if (found) {
         files = readAllFiles();

@@ -1,4 +1,4 @@
-import type { FileTab } from "./types";
+import type { EditorLanguage, FileTab } from "./types";
 
 export const defaultHtml = `<!DOCTYPE html>
 <html>
@@ -83,12 +83,25 @@ export function getTemplateForExt(ext: string): string {
   return TEMPLATES[ext] ?? "";
 }
 
-export function getLanguageForExt(ext: string): string {
+export function getLanguageForExt(ext: string): EditorLanguage {
   switch (ext) {
-    case "html": case "htm": return "html";
-    case "css": return "css";
-    case "js": case "mjs": case "cjs": case "jsx": case "ts": case "tsx": return "javascript";
-    case "json": return "javascript";
-    default: return "javascript";
+    case "html":
+    case "htm":
+      return "html";
+    case "css":
+      return "css";
+    case "md":
+    case "markdown":
+      return "markdown";
+    case "js":
+    case "mjs":
+    case "cjs":
+    case "jsx":
+    case "ts":
+    case "tsx":
+    case "json":
+      return "javascript";
+    default:
+      return "text";
   }
 }

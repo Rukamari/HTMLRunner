@@ -1,6 +1,11 @@
 import initBiomeWasm, { Workspace } from "@biomejs/wasm-web";
 import { byteToCharOffset } from "./encoding";
 
+type PullDiagnosticsResult = Awaited<
+  ReturnType<Workspace["pullDiagnostics"]>
+>;
+type Diagnostic = PullDiagnosticsResult["diagnostics"][number];
+
 let workspace: Workspace | null = null;
 let projectKey: number | null = null;
 let initialized = false;
@@ -70,12 +75,7 @@ export async function lintWithBiome(text: string, filepath = "file.ts"): Promise
     if (!Array.isArray(diags)) return [];
 
     return diags.map((d) => {
-      const diag = d as unknown as {
-        location?: { span?: [number, number] } | null;
-        severity?: string | null;
-        description?: string | null;
-        category?: string | null;
-      };
+      const diag: Diagnostic = d;
 
       const span = diag.location?.span;
       const byteFrom = typeof span?.[0] === "number" ? span[0] : 0;
@@ -86,7 +86,7 @@ export async function lintWithBiome(text: string, filepath = "file.ts"): Promise
 
       let severity: "error" | "warning" | "info" = "info";
       if (diag.severity === "error" || diag.severity === "fatal") severity = "error";
-      if (diag.severity === "warning" || diag.severity === "warn") severity = "warning";
+      if (diag.severity === "warning") severity = "warning";
 
       const rawMsg = diag.description ?? "";
       const category = diag.category

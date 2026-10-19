@@ -11,12 +11,10 @@ function initializeSplit(): void {
   }
 
   const direction = window.innerWidth <= 768 ? "vertical" : "horizontal";
-  const elementEls = [
-    document.getElementById("editor-panel"),
-    document.getElementById("output-panel"),
-  ];
+  const editorPanel = document.getElementById("editor-panel");
+  const outputPanel = document.getElementById("output-panel");
 
-  if (!elementEls.every((el) => el instanceof HTMLElement)) {
+  if (!(editorPanel instanceof HTMLElement) || !(outputPanel instanceof HTMLElement)) {
     console.error("Split.js elements not found");
     return;
   }
@@ -24,22 +22,22 @@ function initializeSplit(): void {
   const _sizes = splitSizesState.get();
   const sizes =
     Array.isArray(_sizes) &&
-    _sizes.length >= 2 &&
+    _sizes.length === 2 &&
     _sizes.every((n) => typeof n === "number" && isFinite(n) && n > 0)
       ? _sizes
       : [50, 50];
 
-  splitInstance = Split(elementEls as HTMLElement[], {
+  splitInstance = Split([editorPanel, outputPanel], {
     sizes,
     minSize: 200,
     gutterSize: 10,
     snapOffset: 0,
     dragInterval: 1,
     direction,
-    elementStyle: (dimension, size, gutterSize) => ({
+    elementStyle: (_dimension, size, gutterSize) => ({
       "flex-basis": `calc(${size}% - ${gutterSize}px)`,
     }),
-    gutterStyle: (dimension, gutterSize) => ({
+    gutterStyle: (_dimension, gutterSize) => ({
       "flex-basis": `${gutterSize}px`,
     }),
     onDragStart: function () {

@@ -219,11 +219,13 @@ function testFunction() {
 Run these from the `Build/` directory (CI runs the same commands):
 
 ```bash
-npm run typecheck   # TypeScript, no emit
+npm run typecheck   # TypeScript strict checks, no emit
 npm run lint        # ESLint
 npm test            # Vitest unit tests
 npm run build       # Production build
 ```
+
+`typecheck` runs with strict null checks plus `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `exactOptionalPropertyTypes`, unused-symbol checks, and `verbatimModuleSyntax`, so invalid states fail before runtime.
 
 ### Contributors
 

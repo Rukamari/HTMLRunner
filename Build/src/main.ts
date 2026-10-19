@@ -61,12 +61,14 @@ import {
 import { initBridge, syncFilesDebounced } from "./vfs-bridge";
 import { showError } from "./ui";
 import { normalizeInternalHref } from "./url";
+import { isNavigationMessage, isOutputType } from "./types";
+import { getById, queryOne } from "./dom";
 import GitWorker from "./git.worker?worker&inline";
 
-function handleNavigationMessage(event: MessageEvent): void {
+function handleNavigationMessage(event: MessageEvent<unknown>): void {
   if (event.origin !== location.origin) return;
-  if (event.data?.type !== "navigate") return;
-  const href = event.data.href as string;
+  if (!isNavigationMessage(event.data)) return;
+  const href = event.data.href;
   if (!href) return;
 
   const targetPath = normalizeInternalHref(href);
@@ -79,21 +81,21 @@ function handleNavigationMessage(event: MessageEvent): void {
 }
 
 function bindMainControls(): void {
-  const previewEl = document.getElementById("preview") as HTMLIFrameElement | null;
-  const consoleEl = document.getElementById("console") as HTMLDivElement | null;
-  const termPanelEl = document.getElementById("terminal") as HTMLElement | null;
-  const bodyEl = document.body as HTMLElement;
+  const previewEl = getById("preview", HTMLIFrameElement);
+  const consoleEl = getById("console", HTMLDivElement);
+  const termPanelEl = getById("terminal", HTMLElement);
+  const bodyEl = document.body;
 
-  const runBtn = document.querySelector(".btn-run") as HTMLButtonElement | null;
+  const runBtn = queryOne(".btn-run", HTMLButtonElement);
   if (runBtn) bindEvent(runBtn, "click", () => actions.runCode());
 
-  const formatBtn = document.querySelector(".btn-format") as HTMLButtonElement | null;
+  const formatBtn = queryOne(".btn-format", HTMLButtonElement);
   if (formatBtn) bindEvent(formatBtn, "click", () => void actions.formatCode());
 
-  const autoRunBtn = document.querySelector(".btn-auto-run") as HTMLButtonElement | null;
+  const autoRunBtn = queryOne(".btn-auto-run", HTMLButtonElement);
   if (autoRunBtn) bindEvent(autoRunBtn, "click", () => actions.toggleAutoRun());
 
-  const themeBtn = document.querySelector(".theme-toggle") as HTMLButtonElement | null;
+  const themeBtn = queryOne(".theme-toggle", HTMLButtonElement);
   if (themeBtn) bindEvent(themeBtn, "click", () => actions.toggleDarkMode());
 
   const autoRunEl = document.getElementById("auto-run-status");
@@ -113,14 +115,14 @@ function bindMainControls(): void {
 
   bindClass(bodyEl, bodyClass);
 
-  const loadingEl = document.getElementById("loading") as HTMLDivElement | null;
+  const loadingEl = getById("loading", HTMLDivElement);
   if (loadingEl) {
     effect(() => {
       loadingEl.classList.toggle("active", loadingVisible.get());
     });
   }
 
-  const errorEl = document.getElementById("error-message") as HTMLDivElement | null;
+  const errorEl = getById("error-message", HTMLDivElement);
   if (errorEl) {
     bindText(errorEl, errorMessage);
     bindVisibility(errorEl, errorVisible);
@@ -131,8 +133,8 @@ function bindMainControls(): void {
     });
   }
 
-  const themeIcon = document.querySelector(".theme-toggle i") as HTMLElement | null;
-  const themeLabelEl = document.querySelector(".theme-toggle span") as HTMLElement | null;
+  const themeIcon = queryOne(".theme-toggle i", HTMLElement);
+  const themeLabelEl = queryOne(".theme-toggle span", HTMLElement);
   if (themeLabelEl) bindText(themeLabelEl, themeLabel);
   if (themeIcon) bindClass(themeIcon, themeIconClass);
 
@@ -151,15 +153,18 @@ function bindMainControls(): void {
     }
   });
 
-  const outputPreviewTabEl = document.querySelector(
+  const outputPreviewTabEl = queryOne(
     '.output-tabs .tab[data-output="preview"]',
-  ) as HTMLElement | null;
-  const outputConsoleTabEl = document.querySelector(
+    HTMLElement,
+  );
+  const outputConsoleTabEl = queryOne(
     '.output-tabs .tab[data-output="console"]',
-  ) as HTMLElement | null;
-  const outputTerminalTabEl = document.querySelector(
+    HTMLElement,
+  );
+  const outputTerminalTabEl = queryOne(
     '.output-tabs .tab[data-output="terminal"]',
-  ) as HTMLElement | null;
+    HTMLElement,
+  );
 
   if (outputPreviewTabEl) {
     effect(() => {
@@ -177,14 +182,14 @@ function bindMainControls(): void {
     });
   }
 
-  const outputTabsContainer = document.querySelector(".output-tabs") as HTMLElement | null;
+  const outputTabsContainer = queryOne(".output-tabs", HTMLElement);
   if (outputTabsContainer) {
     outputTabsContainer.addEventListener("click", (e) => {
-      const el = e.target as Element | null;
-      const target = el?.closest(".tab") as HTMLElement | null;
-      if (!target) return;
-      const out = target.dataset.output;
-      if (out) actions.switchOutput(out);
+      const target = e.target instanceof Element ? e.target : null;
+      const tab = target?.closest<HTMLElement>(".tab") ?? null;
+      if (!tab) return;
+      const out = tab.dataset["output"];
+      if (isOutputType(out)) actions.switchOutput(out);
     });
   }
 
@@ -198,7 +203,7 @@ function bindMainControls(): void {
 }
 
 function bindFileTabs(): void {
-  const fileTabsEl = document.getElementById("file-tabs") as HTMLElement | null;
+  const fileTabsEl = getById("file-tabs", HTMLElement);
   if (!fileTabsEl) return;
 
   effect(() => {
@@ -208,33 +213,35 @@ function bindFileTabs(): void {
   });
 
   fileTabsEl.addEventListener("click", (e) => {
-    const target = e.target as HTMLElement;
-    const tabEl = target.closest(".file-tab") as HTMLElement | null;
-    const closeBtn = target.closest(".file-tab-close") as HTMLElement | null;
-    const addBtn = target.closest(".file-tab-add") as HTMLElement | null;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+    const tabEl = target.closest<HTMLElement>(".file-tab");
+    const closeBtn = target.closest<HTMLElement>(".file-tab-close");
+    const addBtn = target.closest<HTMLElement>(".file-tab-add");
 
     if (closeBtn) {
-      const id = closeBtn.dataset.file;
+      const id = closeBtn.dataset["file"];
       if (id) actions.closeFile(id);
     } else if (addBtn) {
       actions.addFile();
     } else if (tabEl) {
-      const id = tabEl.dataset.file;
+      const id = tabEl.dataset["file"];
       if (id) actions.switchFile(id);
     }
   });
 
   fileTabsEl.addEventListener("contextmenu", (e) => {
-    const target = e.target as HTMLElement;
-    const tabEl = target.closest(".file-tab") as HTMLElement | null;
-    if (tabEl && tabEl.dataset.file) {
-      showTabContextMenu(e, tabEl.dataset.file);
+    const target = e.target instanceof Element ? e.target : null;
+    const tabEl = target?.closest<HTMLElement>(".file-tab") ?? null;
+    const id = tabEl?.dataset["file"];
+    if (id) {
+      showTabContextMenu(e, id);
     }
   });
 }
 
 function bindFileTree(): void {
-  const fileTreeEl = document.getElementById("file-tree") as HTMLElement | null;
+  const fileTreeEl = getById("file-tree", HTMLElement);
   if (!fileTreeEl) return;
 
   effect(() => {
@@ -242,16 +249,18 @@ function bindFileTree(): void {
   });
 
   fileTreeEl.addEventListener("click", (e) => {
-    const target = e.target as HTMLElement;
-    const fileItem = target.closest(".file-tree-item") as HTMLElement | null;
-    const folder = !fileItem
-      ? (target.closest(".file-tree-folder") as HTMLElement | null)
-      : null;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+    const fileItem = target.closest<HTMLElement>(".file-tree-item");
+    const folder = fileItem
+      ? null
+      : target.closest<HTMLElement>(".file-tree-folder");
 
-    if (fileItem && fileItem.dataset.file) {
-      actions.switchFile(fileItem.dataset.file);
+    if (fileItem) {
+      const fileId = fileItem.dataset["file"];
+      if (fileId) actions.switchFile(fileId);
     } else if (folder) {
-      const path = folder.dataset.folder;
+      const path = folder.dataset["folder"];
       if (!path) return;
       if (expandedFolders.has(path)) {
         expandedFolders.delete(path);
@@ -264,14 +273,16 @@ function bindFileTree(): void {
 
   fileTreeEl.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    const target = e.target as HTMLElement;
-    const fileItem = target.closest(".file-tree-item") as HTMLElement | null;
-    const folder = target.closest(".file-tree-folder") as HTMLElement | null;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+    const fileItem = target.closest<HTMLElement>(".file-tree-item");
+    const folder = target.closest<HTMLElement>(".file-tree-folder");
 
-    if (fileItem && fileItem.dataset.file) {
-      showTabContextMenu(e, fileItem.dataset.file);
+    if (fileItem) {
+      const fileId = fileItem.dataset["file"];
+      if (fileId) showTabContextMenu(e, fileId);
     } else if (folder) {
-      const folderPath = folder.dataset.folder;
+      const folderPath = folder.dataset["folder"];
       if (!folderPath) return;
       showFolderContextMenu(e, folderPath);
     }
@@ -302,7 +313,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Editor container not found");
     return;
   }
-
   const initialFiles = filesState.get();
   const initialActiveId = activeFileState.get();
   const initialFile = initialFiles.find((f) => f.id === initialActiveId) ?? initialFiles[0];
@@ -317,7 +327,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initializeLayout();
   initializeLogFilters(document.querySelector(".output-tabs"));
   initializeConsole();
-  const termEl = document.getElementById("terminal") as HTMLElement | null;
+  const termEl = getById("terminal", HTMLElement);
   if (termEl) {
     createTerminal(termEl);
   }
