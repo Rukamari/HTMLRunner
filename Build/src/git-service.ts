@@ -106,6 +106,10 @@ export async function gitStatus(): Promise<string> {
   return await gitExec("status");
 }
 
+export async function gitStatusPorcelain(): Promise<string> {
+  return await gitExec("status", "--porcelain");
+}
+
 export async function gitLog(): Promise<string> {
   return await gitExec("log", "--oneline", "-20");
 }

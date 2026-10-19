@@ -7,7 +7,7 @@ import { bindEvent, effect } from "@nisoku/sairin";
 import { copyToClipboard } from "./utils";
 import { consoleEntries } from "./console";
 import { editor } from "./editor";
-import { logFilters } from "./appState";
+import { activeOutputState, logFilters } from "./appState";
 import { LOG_LEVELS, isLogLevel, type LogLevel } from "./types";
 import { queryOne } from "./dom";
 
@@ -67,34 +67,48 @@ export function initializeCopyButtons(): void {
   const container = document.getElementById("editor-container");
   if (container) {
     const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
     copyBtn.className = "copy-btn";
-    copyBtn.innerHTML = '<i class="far fa-copy"></i>';
+    copyBtn.title = "Copy file contents";
+    copyBtn.setAttribute("aria-label", "Copy file contents");
+    copyBtn.innerHTML = '<i class="far fa-copy" aria-hidden="true"></i>';
     bindEvent(copyBtn, "click", () => {
       copyEditorContent();
-      copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+      copyBtn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
       setTimeout(() => {
-        copyBtn.innerHTML = '<i class="far fa-copy"></i>';
+        copyBtn.innerHTML =
+          '<i class="far fa-copy" aria-hidden="true"></i>';
       }, 2000);
     });
     container.appendChild(copyBtn);
   }
 
-  const consoleTab = document.querySelector('.output-tabs .tab[data-output="console"]');
-  if (consoleTab) {
+  const consoleTab = queryOne('.output-tabs .tab[data-output="console"]', HTMLElement);
+  const outputTabs = queryOne(".output-tabs", HTMLElement);
+  if (consoleTab && outputTabs) {
     const copyAllBtn = document.createElement("button");
-    copyAllBtn.className = "copy-btn";
-    copyAllBtn.style.position = "static";
-    copyAllBtn.style.marginLeft = "auto";
-    copyAllBtn.style.opacity = "1";
-    copyAllBtn.innerHTML = '<i class="far fa-copy"></i> Copy All';
+    copyAllBtn.type = "button";
+    copyAllBtn.className = "copy-btn copy-all-btn";
+    copyAllBtn.title = "Copy all console output";
+    copyAllBtn.setAttribute("aria-label", "Copy all console output");
+    copyAllBtn.innerHTML =
+      '<i class="far fa-copy" aria-hidden="true"></i> Copy All';
+    effect(() => {
+      copyAllBtn.toggleAttribute(
+        "hidden",
+        activeOutputState.get() !== "console",
+      );
+    });
     bindEvent(copyAllBtn, "click", () => {
       copyAllConsole();
-      copyAllBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      copyAllBtn.innerHTML =
+        '<i class="fas fa-check" aria-hidden="true"></i> Copied!';
       setTimeout(() => {
-        copyAllBtn.innerHTML = '<i class="far fa-copy"></i> Copy All';
+        copyAllBtn.innerHTML =
+          '<i class="far fa-copy" aria-hidden="true"></i> Copy All';
       }, 2000);
     });
-    consoleTab.parentElement?.appendChild(copyAllBtn);
+    outputTabs.appendChild(copyAllBtn);
   }
 }
 
@@ -115,9 +129,17 @@ export function initializeLogFilters(outputTabsEl?: Element | null): void {
 
   for (const type of LOG_LEVELS) {
     const button = document.createElement("button");
+    button.type = "button";
     button.className = `filter-toggle ${type}`;
-    const icon = filterIcons[type];
-    button.innerHTML = `<i class="fas fa-${icon}"></i>${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    button.title = `Toggle ${type} messages`;
+    button.setAttribute("aria-label", `Toggle ${type} messages`);
+    const icon = document.createElement("i");
+    icon.className = `fas fa-${filterIcons[type]}`;
+    icon.setAttribute("aria-hidden", "true");
+    button.appendChild(icon);
+    button.appendChild(
+      document.createTextNode(type.charAt(0).toUpperCase() + type.slice(1)),
+    );
 
     bindEvent(button, "click", () => {
       const prev = logFilters.get();
@@ -148,8 +170,9 @@ export function initializeLogFilters(outputTabsEl?: Element | null): void {
   effect(() => {
     const active = new Set(logFilters.get());
     for (const [type, btn] of btnMap) {
-      if (active.has(type)) btn.classList.add("active");
-      else btn.classList.remove("active");
+      const on = active.has(type);
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-pressed", String(on));
     }
   });
 }

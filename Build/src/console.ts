@@ -16,6 +16,7 @@ export const consoleEntries = signal(
 
 /** Keep memory bounded when the preview logs in a tight loop. */
 const MAX_CONSOLE_ENTRIES = 1000;
+const SHOW_TIMESTAMPS_KEY = "htmlrunner-console-timestamps";
 
 function pushConsoleEntry(entry: ConsoleMessage): void {
   const prev = consoleEntries.get();
@@ -27,12 +28,19 @@ function pushConsoleEntry(entry: ConsoleMessage): void {
 }
 
 let consoleOutputEl: HTMLDivElement | null = null;
+let showTimestamps = true;
+let renderHandle: number | null = null;
+
+function isScrolledToBottom(el: HTMLElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+}
 
 function renderConsoleEntries(
   entries: ConsoleMessage[],
   filters: LogLevel[] = logFilters.get(),
 ): void {
   if (!consoleOutputEl) return;
+  const stickToBottom = isScrolledToBottom(consoleOutputEl);
   const activeFilters = new Set(filters);
   const frag = document.createDocumentFragment();
   for (const ev of entries) {
@@ -40,9 +48,13 @@ function renderConsoleEntries(
     const filtered = !activeFilters.has(ev.level);
     entry.className = `console-entry${filtered ? " filtered" : ""}`;
 
-    const timestamp = document.createElement("span");
-    timestamp.className = "timestamp";
-    timestamp.textContent = new Date(ev.timestamp).toLocaleTimeString();
+    if (showTimestamps) {
+      const timestamp = document.createElement("span");
+      timestamp.className = "timestamp";
+      timestamp.textContent = new Date(ev.timestamp).toLocaleTimeString();
+      entry.appendChild(timestamp);
+      entry.appendChild(document.createTextNode(" "));
+    }
 
     const message = document.createElement("span");
     message.className = `console-${ev.level}`;
@@ -107,20 +119,30 @@ function renderConsoleEntries(
       message.appendChild(stack);
     }
 
-    entry.appendChild(timestamp);
-    entry.appendChild(document.createTextNode(" "));
     entry.appendChild(message);
     frag.appendChild(entry);
   }
   consoleOutputEl.replaceChildren(frag);
-  consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+  if (stickToBottom) {
+    consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+  }
+}
+
+function scheduleConsoleRender(): void {
+  if (renderHandle !== null) return;
+  renderHandle = window.requestAnimationFrame(() => {
+    renderHandle = null;
+    renderConsoleEntries(consoleEntries.get(), logFilters.get());
+  });
 }
 
 effect(() => {
   const entries = consoleEntries.get();
   const filters = logFilters.get();
+  void entries;
+  void filters;
   if (!consoleOutputEl) return;
-  renderConsoleEntries(entries, filters);
+  scheduleConsoleRender();
 });
 
 export const consoleInterceptor = `
@@ -150,8 +172,26 @@ document.addEventListener('click', function(e) {
 
 export function initializeConsole(): void {
   consoleOutputEl = getById("console", HTMLDivElement);
+  try {
+    showTimestamps = localStorage.getItem(SHOW_TIMESTAMPS_KEY) !== "false";
+  } catch {
+    showTimestamps = true;
+  }
   if (consoleOutputEl) renderConsoleEntries(consoleEntries.get());
   window.addEventListener("message", handleConsoleMessage);
+}
+
+export function timestampsVisible(): boolean {
+  return showTimestamps;
+}
+
+export function toggleTimestamps(): void {
+  showTimestamps = !showTimestamps;
+  try {
+    localStorage.setItem(SHOW_TIMESTAMPS_KEY, String(showTimestamps));
+  } catch {
+  }
+  renderConsoleEntries(consoleEntries.get(), logFilters.get());
 }
 
 function handleConsoleMessage(event: MessageEvent<unknown>): void {

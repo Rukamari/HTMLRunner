@@ -43,12 +43,10 @@ async function runShellCommand(line: string): Promise<void> {
 
   const container = getContainer();
   try {
-    const result = await container.run(line, {
+    await container.run(line, {
       onStdout: (data) => write(data),
       onStderr: (data) => write(data),
     });
-    if (result.exitCode !== 0 && result.stderr) {
-    }
   } catch (err) {
     writeln(`Error: ${err instanceof Error ? err.message : String(err)}`);
   }

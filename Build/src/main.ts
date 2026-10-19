@@ -1,6 +1,8 @@
 import { Buffer } from "buffer";
 Object.assign(globalThis, { Buffer });
 
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
 import { createEditor, switchToFile } from "./editor";
 import { createTerminal, fitTerminal } from "./terminal";
 import { runCode } from "./runner";
@@ -24,6 +26,8 @@ import {
   themeLabel,
   themeIconClass,
   cursorPos,
+  autoRunState,
+  darkModeState,
 } from "./appState";
 import {
   bindEvent,
@@ -59,10 +63,11 @@ import {
   syncAllFilesToWorker,
 } from "./git-service";
 import { initBridge, syncFilesDebounced } from "./vfs-bridge";
-import { showError } from "./ui";
+import { showError, showInfo } from "./ui";
 import { normalizeInternalHref } from "./url";
 import { isNavigationMessage, isOutputType } from "./types";
 import { getById, queryOne } from "./dom";
+import { closeInfoDialog } from "./dialogs";
 import GitWorker from "./git.worker?worker&inline";
 
 function handleNavigationMessage(event: MessageEvent<unknown>): void {
@@ -93,20 +98,37 @@ function bindMainControls(): void {
   if (formatBtn) bindEvent(formatBtn, "click", () => void actions.formatCode());
 
   const autoRunBtn = queryOne(".btn-auto-run", HTMLButtonElement);
-  if (autoRunBtn) bindEvent(autoRunBtn, "click", () => actions.toggleAutoRun());
+  if (autoRunBtn) {
+    autoRunBtn.setAttribute("aria-pressed", String(autoRunState.get()));
+    bindEvent(autoRunBtn, "click", () => actions.toggleAutoRun());
+    effect(() => {
+      const on = autoRunState.get();
+      autoRunBtn.setAttribute("aria-pressed", String(on));
+    });
+  }
 
   const themeBtn = queryOne(".theme-toggle", HTMLButtonElement);
-  if (themeBtn) bindEvent(themeBtn, "click", () => actions.toggleDarkMode());
+  if (themeBtn) {
+    bindEvent(themeBtn, "click", () => actions.toggleDarkMode());
+    effect(() => {
+      themeBtn.setAttribute("aria-pressed", String(darkModeState.get()));
+    });
+  }
 
   const autoRunEl = document.getElementById("auto-run-status");
   if (autoRunEl) bindText(autoRunEl, autoRunText);
 
   const previewOpenBtn = document.getElementById("preview-open-btn");
   if (previewOpenBtn && previewEl) {
+    // Only meaningful while the preview itself is the visible panel.
+    effect(() => {
+      const onPreview = activeOutputState.get() === "preview";
+      previewOpenBtn.toggleAttribute("hidden", !onPreview);
+    });
     bindEvent(previewOpenBtn, "click", () => {
       const src = previewEl.src;
       if (src && src !== "about:blank") {
-        window.open(src, "_blank");
+        window.open(src, "_blank", "noopener");
       } else {
         showError("Run code first to preview");
       }
@@ -114,6 +136,9 @@ function bindMainControls(): void {
   }
 
   bindClass(bodyEl, bodyClass);
+  effect(() => {
+    document.documentElement.classList.toggle("dark-mode", darkModeState.get());
+  });
 
   const loadingEl = getById("loading", HTMLDivElement);
   if (loadingEl) {
@@ -182,14 +207,50 @@ function bindMainControls(): void {
     });
   }
 
-  const outputTabsContainer = queryOne(".output-tabs", HTMLElement);
-  if (outputTabsContainer) {
-    outputTabsContainer.addEventListener("click", (e) => {
+  const outputTablist = queryOne(".output-tablist", HTMLElement);
+  if (outputTablist) {
+    const outputTabEls: HTMLElement[] = [];
+    for (const tab of Array.from(
+      outputTablist.querySelectorAll<HTMLElement>(".tab[data-output]"),
+    )) {
+      const out = tab.dataset["output"];
+      if (!isOutputType(out)) continue;
+      outputTabEls.push(tab);
+
+      effect(() => {
+        const active = activeOutputState.get() === out;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+      });
+    }
+
+    const activateOutputTab = (tab: HTMLElement): void => {
+      const out = tab.dataset["output"];
+      if (!isOutputType(out)) return;
+      actions.switchOutput(out);
+      tab.focus();
+    };
+
+    outputTablist.addEventListener("click", (e) => {
       const target = e.target instanceof Element ? e.target : null;
       const tab = target?.closest<HTMLElement>(".tab") ?? null;
       if (!tab) return;
       const out = tab.dataset["output"];
       if (isOutputType(out)) actions.switchOutput(out);
+    });
+
+    outputTablist.addEventListener("keydown", (e) => {
+      const current = (e.target as Element | null)?.closest<HTMLElement>(".tab");
+      if (!current) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const index = outputTabEls.indexOf(current);
+      if (index === -1) return;
+      const next =
+        e.key === "ArrowRight"
+          ? outputTabEls[(index + 1) % outputTabEls.length]
+          : outputTabEls[(index - 1 + outputTabEls.length) % outputTabEls.length];
+      if (next) activateOutputTab(next);
     });
   }
 
@@ -200,6 +261,25 @@ function bindMainControls(): void {
       cursorEl.textContent = `Ln ${pos.line}, Col ${pos.col}`;
     });
   }
+
+  document.addEventListener("keydown", (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (e.key === "Escape") {
+      closeInfoDialog();
+      return;
+    }
+
+    if (!mod) return;
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      actions.runCode().catch(console.error);
+    } else if (e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      showInfo("Workspace saved");
+    }
+  });
 }
 
 function bindFileTabs(): void {
@@ -209,24 +289,73 @@ function bindFileTabs(): void {
   effect(() => {
     const files = filesState.get();
     const activeId = activeFileState.get();
+    void files;
+    void activeId;
     renderFileTabs(fileTabsEl, files, activeId);
   });
+
+  const activateTab = (id: string): void => {
+    const tab = fileTabsEl.querySelector<HTMLElement>(
+      `.file-tab[data-file="${CSS.escape(id)}"]`,
+    );
+    tab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+
+  const addBtn = getById("file-tab-add", HTMLElement);
+  if (addBtn) bindEvent(addBtn, "click", () => actions.addFile());
 
   fileTabsEl.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : null;
     if (!target) return;
     const tabEl = target.closest<HTMLElement>(".file-tab");
     const closeBtn = target.closest<HTMLElement>(".file-tab-close");
-    const addBtn = target.closest<HTMLElement>(".file-tab-add");
 
     if (closeBtn) {
       const id = closeBtn.dataset["file"];
       if (id) actions.closeFile(id);
-    } else if (addBtn) {
-      actions.addFile();
     } else if (tabEl) {
       const id = tabEl.dataset["file"];
-      if (id) actions.switchFile(id);
+      if (id) {
+        actions.switchFile(id);
+        activateTab(id);
+      }
+    }
+  });
+
+  fileTabsEl.addEventListener("keydown", (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    const tabEl = target?.closest<HTMLElement>(".file-tab") ?? null;
+    if (!tabEl) return;
+    const id = tabEl.dataset["file"];
+    if (!id) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      actions.switchFile(id);
+      activateTab(id);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      actions.closeFile(id);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const tabs = Array.from(
+        fileTabsEl.querySelectorAll<HTMLElement>(".file-tab"),
+      );
+      const index = tabs.indexOf(tabEl);
+      if (index === -1) return;
+      const offset = e.key === "ArrowRight" ? 1 : -1;
+      const nextId = tabs[(index + offset + tabs.length) % tabs.length]?.dataset[
+        "file"
+      ];
+      if (!nextId) return;
+      actions.switchFile(nextId);
+      activateTab(nextId);
+      window.requestAnimationFrame(() => {
+        fileTabsEl
+          .querySelector<HTMLElement>(
+            `.file-tab[data-file="${CSS.escape(nextId)}"]`,
+          )
+          ?.focus();
+      });
     }
   });
 
@@ -245,8 +374,20 @@ function bindFileTree(): void {
   if (!fileTreeEl) return;
 
   effect(() => {
+    const files = filesState.get();
+    const activeId = activeFileState.get();
+    void files;
+    void activeId;
     renderFileTree(fileTreeEl);
   });
+
+  const openFile = (fileId: string): void => {
+    actions.switchFile(fileId);
+    const inTree = fileTreeEl.querySelector<HTMLElement>(
+      `.file-tree-item[data-file="${CSS.escape(fileId)}"]`,
+    );
+    inTree?.scrollIntoView({ block: "nearest" });
+  };
 
   fileTreeEl.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : null;
@@ -258,7 +399,7 @@ function bindFileTree(): void {
 
     if (fileItem) {
       const fileId = fileItem.dataset["file"];
-      if (fileId) actions.switchFile(fileId);
+      if (fileId) openFile(fileId);
     } else if (folder) {
       const path = folder.dataset["folder"];
       if (!path) return;
@@ -268,6 +409,21 @@ function bindFileTree(): void {
         expandedFolders.add(path);
       }
       renderFileTree(fileTreeEl);
+    }
+  });
+
+  fileTreeEl.addEventListener("keydown", (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    const fileItem = target?.closest<HTMLElement>(".file-tree-item") ?? null;
+    if (!fileItem) return;
+    const fileId = fileItem.dataset["file"];
+    if (!fileId) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openFile(fileId);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      actions.closeFile(fileId);
     }
   });
 

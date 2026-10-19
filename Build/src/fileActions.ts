@@ -340,30 +340,78 @@ function showContextMenu(e: MouseEvent, items: ContextMenuItem[]): void {
 
   const menu = document.createElement("div");
   menu.className = "tab-context-menu";
-  menu.style.left = e.clientX + "px";
-  menu.style.top = e.clientY + "px";
+  menu.setAttribute("role", "menu");
 
   for (const item of items) {
     const el = document.createElement("div");
     el.className = "context-menu-item";
-    el.innerHTML = `<i class="fas ${item.icon}"></i> ${item.label}`;
+    el.setAttribute("role", "menuitem");
+    el.tabIndex = -1;
+
+    const icon = document.createElement("i");
+    icon.className = `fas ${item.icon}`;
+    icon.setAttribute("aria-hidden", "true");
+    el.appendChild(icon);
+    el.appendChild(document.createTextNode(` ${item.label}`));
+
     el.addEventListener("click", () => {
-      menu.remove();
+      close();
       item.action();
     });
     menu.appendChild(el);
   }
 
-  const closeMenu = (ev: MouseEvent) => {
+  function close(): void {
+    menu.remove();
+    document.removeEventListener("click", closeOnOutsideClick);
+    document.removeEventListener("keydown", closeOnKeyDown);
+    window.removeEventListener("resize", close);
+  }
+
+  const closeOnOutsideClick = (ev: MouseEvent): void => {
     const target = ev.target;
-    if (!(target instanceof Node) || !menu.contains(target)) {
-      menu.remove();
-      document.removeEventListener("click", closeMenu);
-    }
+    if (!(target instanceof Node) || !menu.contains(target)) close();
   };
-  setTimeout(() => document.addEventListener("click", closeMenu), 0);
+
+  const closeOnKeyDown = (ev: KeyboardEvent): void => {
+    if (ev.key === "Escape") close();
+  };
 
   document.body.appendChild(menu);
+
+  const rect = menu.getBoundingClientRect();
+  const left = Math.max(4, Math.min(e.clientX, window.innerWidth - rect.width - 4));
+  const top = Math.max(4, Math.min(e.clientY, window.innerHeight - rect.height - 4));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+
+  const firstItem = menu.querySelector<HTMLElement>(".context-menu-item");
+  firstItem?.focus();
+
+  menu.addEventListener("keydown", (ev) => {
+    const menuItems = Array.from(
+      menu.querySelectorAll<HTMLElement>(".context-menu-item"),
+    );
+    if (menuItems.length === 0) return;
+    const active = document.activeElement;
+    const index = active instanceof HTMLElement ? menuItems.indexOf(active) : -1;
+    if (ev.key === "ArrowDown") {
+      ev.preventDefault();
+      menuItems[(index + 1) % menuItems.length]?.focus();
+    } else if (ev.key === "ArrowUp") {
+      ev.preventDefault();
+      menuItems[(index - 1 + menuItems.length) % menuItems.length]?.focus();
+    } else if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.click();
+      }
+    }
+  });
+
+  setTimeout(() => document.addEventListener("click", closeOnOutsideClick), 0);
+  document.addEventListener("keydown", closeOnKeyDown);
+  window.addEventListener("resize", close);
 }
 
 export function showFolderContextMenu(e: MouseEvent, folderPath: string): void {

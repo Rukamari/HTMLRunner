@@ -8,7 +8,7 @@ const FILE_ICONS: Record<string, string> = {
   js: "fab fa-js", mjs: "fab fa-js", cjs: "fab fa-js",
   jsx: "fab fa-react",
   ts: "fab fa-js", tsx: "fab fa-react",
-  json: "fas fa-brackets-curly",
+  json: "fas fa-code",
 };
 
 export function getFileIcon(name: string): string {
@@ -31,6 +31,10 @@ export function renderFileTabs(
     const tab = document.createElement("div");
     tab.className = `file-tab${file.id === activeId ? " active" : ""}`;
     tab.dataset["file"] = file.id;
+    tab.tabIndex = file.id === activeId ? 0 : -1;
+    tab.title = file.name;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(file.id === activeId));
 
     const nameSpan = document.createElement("span");
     nameSpan.className = "file-tab-name";
@@ -38,19 +42,16 @@ export function renderFileTabs(
     tab.appendChild(nameSpan);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "file-tab-close";
     closeBtn.innerHTML = "&times;";
     closeBtn.dataset["file"] = file.id;
+    closeBtn.title = `Close ${file.name}`;
+    closeBtn.setAttribute("aria-label", `Close ${file.name}`);
     tab.appendChild(closeBtn);
 
     container.appendChild(tab);
   }
-
-  const addBtn = document.createElement("button");
-  addBtn.className = "file-tab-add";
-  addBtn.innerHTML = "+";
-  addBtn.title = "New file";
-  container.appendChild(addBtn);
 }
 
 export function renderTreeNode(
@@ -65,10 +66,18 @@ export function renderTreeNode(
   if (node.isFile) {
     item.className = `file-tree-item${node.file && node.file.id === activeId ? " active" : ""}`;
     item.dataset["file"] = node.file?.id;
+    item.tabIndex = 0;
+    item.setAttribute("role", "treeitem");
+    item.setAttribute("aria-level", String(depth + 1));
+    if (node.file && node.file.id === activeId) {
+      item.setAttribute("aria-selected", "true");
+    }
+    item.setAttribute("aria-label", node.name);
 
     const icon = document.createElement("i");
     const fileName = node.file?.name ?? node.name;
     icon.className = getFileIcon(fileName) + " file-tree-icon";
+    icon.setAttribute("aria-hidden", "true");
     item.appendChild(icon);
 
     const name = document.createElement("span");
@@ -79,14 +88,21 @@ export function renderTreeNode(
     const isOpen = expandedFolders.has(node.path);
     item.className = "file-tree-folder";
     item.dataset["folder"] = node.path;
+    item.tabIndex = 0;
+    item.setAttribute("role", "treeitem");
+    item.setAttribute("aria-level", String(depth + 1));
+    item.setAttribute("aria-expanded", String(isOpen));
+    item.setAttribute("aria-label", node.name);
 
     const toggle = document.createElement("span");
     toggle.className = "file-tree-toggle";
     toggle.textContent = isOpen ? "▾" : "▸";
+    toggle.setAttribute("aria-hidden", "true");
     item.appendChild(toggle);
 
     const icon = document.createElement("i");
     icon.className = "fas fa-folder" + (isOpen ? "-open" : "") + " file-tree-icon";
+    icon.setAttribute("aria-hidden", "true");
     item.appendChild(icon);
 
     const name = document.createElement("span");
@@ -101,6 +117,7 @@ export function renderTreeNode(
       if (visible.length > 0) {
         const children = document.createElement("div");
         children.className = "file-tree-children";
+        children.setAttribute("role", "group");
         const sorted = [...visible];
         sortTreeNodes(sorted);
         let hasChild = false;

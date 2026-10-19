@@ -3,14 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A browser-based HTML, CSS and JavaScript editor with live preview, console and git.">
+    <meta name="color-scheme" content="light dark">
     <title>HTMLRunner</title>
+    <link rel="icon" type="image/png" href="./favicon.png">
     <link rel="stylesheet" href="./styles/styles.css">
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem("htmlRunnerState");
+                var dark = localStorage.getItem("darkMode") === "true";
+                if (saved) {
+                    var parsed = JSON.parse(saved);
+                    if (parsed && typeof parsed.darkMode === "boolean") {
+                        dark = parsed.darkMode;
+                    }
+                }
+                if (dark) document.documentElement.classList.add("dark-mode");
+            } catch (e) {
+                /* First run or blocked storage: default to light. */
+            }
+        })();
+    </script>
 </head>
 <body>
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
+    <div class="loading" id="loading" role="status" aria-label="Loading">
+        <div class="spinner" aria-hidden="true"></div>
     </div>
-    <div class="error-message" id="error-message"></div>
+    <div class="error-message" id="error-message" role="status" aria-live="polite" hidden></div>
     <div class="container">
         <div class="menubar">
             <div class="menubar-left">
@@ -25,83 +45,91 @@
                 </div>
             </div>
             <div class="menubar-right">
-                <button class="btn btn-run"><i class="fas fa-play"></i> Run</button>
-                <button class="btn btn-format" title="Format Code"><i class="fas fa-code"></i></button>
-                <button class="btn btn-auto-run" title="Toggle Auto-Run"><i class="fas fa-sync"></i> <span id="auto-run-status">Off</span></button>
-                <button class="theme-toggle" title="Toggle Theme">
-                    <i class="fas fa-moon"></i>
+                <button class="btn btn-run" type="button">
+                    <i class="fas fa-play" aria-hidden="true"></i> Run
+                </button>
+                <button class="btn btn-format" type="button" title="Format Code" aria-label="Format code">
+                    <i class="fas fa-code" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-auto-run" type="button" title="Toggle Auto-Run" aria-pressed="false">
+                    <i class="fas fa-sync" aria-hidden="true"></i> <span id="auto-run-status">Off</span>
+                </button>
+                <button class="theme-toggle" type="button" title="Toggle Theme" aria-pressed="false">
+                    <i class="fas fa-moon" aria-hidden="true"></i>
                     <span>Dark Mode</span>
                 </button>
             </div>
         </div>
-        <div class="menu-dropdown" id="menu-file">
-            <div class="menu-dropdown-item" data-action="addFile"><i class="fas fa-plus"></i> New File</div>
-            <div class="menu-dropdown-item" data-action="addFolder"><i class="fas fa-folder-plus"></i> New Folder</div>
-            <div class="menu-dropdown-item" data-action="importFiles"><i class="fas fa-folder-open"></i> Import Files</div>
+        <div class="menu-dropdown" id="menu-file" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="addFile"><i class="fas fa-plus" aria-hidden="true"></i> New File</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="addFolder"><i class="fas fa-folder-plus" aria-hidden="true"></i> New Folder</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="importFiles"><i class="fas fa-folder-open" aria-hidden="true"></i> Import Files</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="exportAsZip"><i class="fas fa-download"></i> Export ZIP</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="exportAsZip"><i class="fas fa-download" aria-hidden="true"></i> Export ZIP</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="resetCode"><i class="fas fa-undo"></i> Reset to Defaults</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="resetCode"><i class="fas fa-undo" aria-hidden="true"></i> Reset to Defaults</div>
         </div>
-        <div class="menu-dropdown" id="menu-edit">
-            <div class="menu-dropdown-item" data-action="undo"><i class="fas fa-undo"></i> Undo</div>
-            <div class="menu-dropdown-item" data-action="redo"><i class="fas fa-redo"></i> Redo</div>
+        <div class="menu-dropdown" id="menu-edit" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="undo"><i class="fas fa-undo" aria-hidden="true"></i> Undo</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="redo"><i class="fas fa-redo" aria-hidden="true"></i> Redo</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="toggleSearch"><i class="fas fa-search"></i> Find</div>
-            <div class="menu-dropdown-item" data-action="toggleReplace"><i class="fas fa-exchange-alt"></i> Find &amp; Replace</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleSearch"><i class="fas fa-search" aria-hidden="true"></i> Find</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleReplace"><i class="fas fa-exchange-alt" aria-hidden="true"></i> Find &amp; Replace</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="formatCode"><i class="fas fa-code"></i> Format Code</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="formatCode"><i class="fas fa-code" aria-hidden="true"></i> Format Code</div>
         </div>
-            <div class="menu-dropdown" id="menu-view">
-                <div class="menu-dropdown-item" data-action="toggleSidebar"><i class="fas fa-columns"></i> Toggle Sidebar</div>
-                <div class="menu-dropdown-item" data-action="switchOutput-preview"><i class="fas fa-eye"></i> Show Preview</div>
-                <div class="menu-dropdown-item" data-action="switchOutput-console"><i class="fas fa-terminal"></i> Show Console</div>
-                <div class="menu-dropdown-item" data-action="switchOutput-terminal"><i class="fas fa-window-terminal"></i> Show Terminal</div>
+        <div class="menu-dropdown" id="menu-view" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleSidebar"><i class="fas fa-columns" aria-hidden="true"></i> Toggle Sidebar</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="switchOutput-preview"><i class="fas fa-eye" aria-hidden="true"></i> Show Preview</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="switchOutput-console"><i class="fas fa-terminal" aria-hidden="true"></i> Show Console</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="switchOutput-terminal"><i class="fas fa-desktop" aria-hidden="true"></i> Show Terminal</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="toggleDarkMode"><i class="fas fa-moon"></i> Toggle Dark Mode</div>
-            <div class="menu-dropdown-item" data-action="toggleAutoRun"><i class="fas fa-sync"></i> Toggle Auto-Run</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleDarkMode"><i class="fas fa-moon" aria-hidden="true"></i> Toggle Dark Mode</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleAutoRun"><i class="fas fa-sync" aria-hidden="true"></i> Toggle Auto-Run</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="toggleTimestamps"><i class="fas fa-clock" aria-hidden="true"></i> Toggle Console Timestamps</div>
         </div>
-        <div class="menu-dropdown" id="menu-run">
-            <div class="menu-dropdown-item" data-action="runCode"><i class="fas fa-play"></i> Run Code</div>
+        <div class="menu-dropdown" id="menu-run" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="runCode"><i class="fas fa-play" aria-hidden="true"></i> Run Code</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="clearConsole"><i class="fas fa-trash"></i> Clear Console</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="clearConsole"><i class="fas fa-trash" aria-hidden="true"></i> Clear Console</div>
         </div>
-        <div class="menu-dropdown" id="menu-git-menu">
-            <div class="menu-dropdown-item" data-action="gitStatus"><i class="fas fa-info-circle"></i> Status</div>
-            <div class="menu-dropdown-item" data-action="gitDiff"><i class="fas fa-code-branch"></i> Diff</div>
-            <div class="menu-dropdown-item" data-action="gitLog"><i class="fas fa-history"></i> Log</div>
+        <div class="menu-dropdown" id="menu-git-menu" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitStatus"><i class="fas fa-info-circle" aria-hidden="true"></i> Status</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitDiff"><i class="fas fa-code-branch" aria-hidden="true"></i> Diff</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitLog"><i class="fas fa-history" aria-hidden="true"></i> Log</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="gitCommit"><i class="fas fa-check"></i> Commit</div>
-            <div class="menu-dropdown-item" data-action="gitPush"><i class="fas fa-cloud-upload-alt"></i> Push</div>
-            <div class="menu-dropdown-item" data-action="gitPull"><i class="fas fa-cloud-download-alt"></i> Pull</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitCommit"><i class="fas fa-check" aria-hidden="true"></i> Commit</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitPush"><i class="fas fa-cloud-upload-alt" aria-hidden="true"></i> Push</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitPull"><i class="fas fa-cloud-download-alt" aria-hidden="true"></i> Pull</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="gitClone"><i class="fas fa-clone"></i> Clone</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="gitClone"><i class="fas fa-clone" aria-hidden="true"></i> Clone</div>
         </div>
-        <div class="menu-dropdown" id="menu-help">
-            <div class="menu-dropdown-item" data-action="about"><i class="fas fa-info-circle"></i> About HTMLRunner</div>
+        <div class="menu-dropdown" id="menu-help" role="menu">
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="about"><i class="fas fa-info-circle" aria-hidden="true"></i> About HTMLRunner</div>
             <div class="menu-dropdown-separator"></div>
-            <div class="menu-dropdown-item" data-action="openShortcuts"><i class="fas fa-keyboard"></i> Keyboard Shortcuts</div>
+            <div class="menu-dropdown-item" role="menuitem" tabindex="-1" data-action="openShortcuts"><i class="fas fa-keyboard" aria-hidden="true"></i> Keyboard Shortcuts</div>
         </div>
         <div class="main">
             <div class="editor-panel" id="editor-panel">
                 <div class="editor-header">
-                    <div class="file-tabs" id="file-tabs"></div>
+                    <div class="file-tabs" id="file-tabs" role="tablist" aria-label="Open files"></div>
+                    <button class="file-tab-add" type="button" id="file-tab-add" title="New file" aria-label="New file"><i class="fas fa-plus" aria-hidden="true"></i></button>
                 </div>
                 <div class="editor-body">
                     <div class="sidebar" id="sidebar">
                         <div class="sidebar-header">
                             <span>FILES</span>
                             <div class="sidebar-actions">
-                                <button class="sidebar-new-btn" id="sidebar-new-btn" title="New File"><i class="fas fa-plus"></i></button>
-                                <button class="sidebar-folder-btn" id="sidebar-folder-btn" title="New Folder"><i class="fas fa-folder-plus"></i></button>
-                                <button class="sidebar-import-btn" id="sidebar-import-btn" title="Import Files"><i class="fas fa-folder-open"></i></button>
+                                <button class="sidebar-new-btn" type="button" id="sidebar-new-btn" title="New File" aria-label="New file"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                                <button class="sidebar-folder-btn" type="button" id="sidebar-folder-btn" title="New Folder" aria-label="New folder"><i class="fas fa-folder-plus" aria-hidden="true"></i></button>
+                                <button class="sidebar-import-btn" type="button" id="sidebar-import-btn" title="Import Files" aria-label="Import files"><i class="fas fa-folder-open" aria-hidden="true"></i></button>
                             </div>
                         </div>
-                        <div class="file-tree" id="file-tree"></div>
+                        <div class="file-tree" id="file-tree" role="tree" aria-label="Workspace files"></div>
                         <div class="sidebar-section">
                             <div class="sidebar-header">
                                 <span>GIT</span>
-                                <button class="sidebar-git-btn" id="sidebar-git-btn" title="Commit"><i class="fas fa-check"></i></button>
+                                <button class="sidebar-git-btn" type="button" id="sidebar-git-btn" title="Commit" aria-label="Commit changes"><i class="fas fa-check" aria-hidden="true"></i></button>
                             </div>
                             <div class="git-status" id="git-status"></div>
                         </div>
@@ -111,14 +139,16 @@
             </div>
             <div class="output-panel" id="output-panel">
                 <div class="output-tabs">
-                    <div class="tab active" data-output="preview">Preview</div>
-                    <div class="tab" data-output="console">Console</div>
-                    <div class="tab" data-output="terminal">Terminal</div>
+                    <div class="output-tablist" role="tablist" aria-label="Output panels">
+                        <div class="tab active" data-output="preview" role="tab" tabindex="0" aria-selected="true">Preview</div>
+                        <div class="tab" data-output="console" role="tab" tabindex="-1" aria-selected="false">Console</div>
+                        <div class="tab" data-output="terminal" role="tab" tabindex="-1" aria-selected="false">Terminal</div>
+                    </div>
                 </div>
                 <div class="output-content">
-                    <button class="preview-open-btn" id="preview-open-btn" title="Open preview in new tab"><i class="fas fa-external-link-alt"></i></button>
-                    <iframe id="preview" class="preview active"></iframe>
-                    <div id="console" class="console"></div>
+                    <button class="preview-open-btn" type="button" id="preview-open-btn" title="Open preview in new tab" aria-label="Open preview in a new tab"><i class="fas fa-external-link-alt" aria-hidden="true"></i></button>
+                    <iframe id="preview" class="preview active" title="Code preview"></iframe>
+                    <div id="console" class="console" role="log" aria-live="polite"></div>
                     <div id="terminal" class="terminal-panel"></div>
                 </div>
             </div>

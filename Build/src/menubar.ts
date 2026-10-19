@@ -5,7 +5,7 @@ import {
   importFilesAction,
   resetWorkspaceAction,
 } from "./fileActions";
-import { clearConsole } from "./console";
+import { clearConsole, toggleTimestamps } from "./console";
 import { formatCode, runCode } from "./runner";
 import { showAbout, showShortcuts } from "./dialogs";
 import {
@@ -38,6 +38,7 @@ const MENU_ACTIONS = [
   "toggleSidebar",
   "toggleDarkMode",
   "toggleAutoRun",
+  "toggleTimestamps",
   "runCode",
   "clearConsole",
   "gitStatus",
@@ -78,6 +79,7 @@ const MENU_ACTION_MAP = {
   toggleSidebar: () => toggleSidebar(),
   toggleDarkMode: () => toggleDarkMode(),
   toggleAutoRun: () => toggleAutoRun(),
+  toggleTimestamps: () => toggleTimestamps(),
   runCode: () => {
     runCode().catch(console.error);
   },
@@ -110,49 +112,82 @@ const MENU_ACTION_MAP = {
 let activeMenu: string | null = null;
 
 export function initializeMenuBar(): void {
-  const menuItems = document.querySelectorAll(".menu-item");
+  const menuItems = Array.from(document.querySelectorAll(".menu-item")).filter(
+    (item): item is HTMLElement => item instanceof HTMLElement,
+  );
   const dropdowns = document.querySelectorAll(".menu-dropdown");
 
   function closeAllMenus(): void {
     activeMenu = null;
     dropdowns.forEach((d) => d.classList.remove("open"));
+    menuItems.forEach((item) => item.setAttribute("aria-expanded", "false"));
+  }
+
+  function openMenu(menuId: string, item: HTMLElement): void {
+    closeAllMenus();
+    const dropdown = getById(`menu-${menuId}`, HTMLElement);
+    if (!dropdown) return;
+
+    const rect = item.getBoundingClientRect();
+    dropdown.classList.add("open");
+    const maxLeft = Math.max(4, window.innerWidth - dropdown.offsetWidth - 4);
+    const maxTop = Math.max(4, window.innerHeight - dropdown.offsetHeight - 4);
+    dropdown.style.left = `${Math.min(rect.left, maxLeft)}px`;
+    dropdown.style.top = `${Math.min(rect.bottom, maxTop)}px`;
+    item.setAttribute("aria-expanded", "true");
+    activeMenu = menuId;
+  }
+
+  function moveMenuFocus(offset: number): void {
+    if (menuItems.length === 0) return;
+    const openIndex = menuItems.findIndex(
+      (item) => item.dataset["menu"] === activeMenu,
+    );
+    if (openIndex === -1) {
+      const focused = menuItems.findIndex((item) => item === document.activeElement);
+      const index = (focused + offset + menuItems.length) % menuItems.length;
+      menuItems[index]?.focus();
+      return;
+    }
+    const index = (openIndex + offset + menuItems.length) % menuItems.length;
+    const item = menuItems[index];
+    if (!item) return;
+    const menuId = item.dataset["menu"];
+    if (menuId) openMenu(menuId, item);
+    item.focus();
   }
 
   menuItems.forEach((item) => {
-    if (!(item instanceof HTMLElement)) return;
     const menuId = item.dataset["menu"];
     if (!menuId) return;
 
+    item.tabIndex = 0;
+    item.setAttribute("role", "button");
+    item.setAttribute("aria-haspopup", "true");
+    item.setAttribute("aria-expanded", "false");
+
     item.addEventListener("click", (e) => {
       e.stopPropagation();
-      const dropdown = getById(`menu-${menuId}`, HTMLElement);
-      if (!dropdown) return;
-
       if (activeMenu === menuId) {
         closeAllMenus();
         return;
       }
+      openMenu(menuId, item);
+    });
 
-      closeAllMenus();
-      const rect = item.getBoundingClientRect();
-      dropdown.style.left = `${rect.left}px`;
-      dropdown.style.top = `${rect.bottom}px`;
-      dropdown.classList.add("open");
-      activeMenu = menuId;
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openMenu(menuId, item);
+        const first = getById(`menu-${menuId}`, HTMLElement)?.querySelector(
+          ".menu-dropdown-item",
+        );
+        if (first instanceof HTMLElement) first.focus();
+      }
     });
 
     item.addEventListener("mouseenter", () => {
-      if (activeMenu && activeMenu !== menuId) {
-        const dropdown = getById(`menu-${menuId}`, HTMLElement);
-        if (!dropdown) return;
-        const prev = getById(`menu-${activeMenu}`, HTMLElement);
-        if (prev) prev.classList.remove("open");
-        const rect = item.getBoundingClientRect();
-        dropdown.style.left = `${rect.left}px`;
-        dropdown.style.top = `${rect.bottom}px`;
-        dropdown.classList.add("open");
-        activeMenu = menuId;
-      }
+      if (activeMenu && activeMenu !== menuId) openMenu(menuId, item);
     });
   });
 
@@ -185,6 +220,40 @@ export function initializeMenuBar(): void {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeAllMenus();
+    if (e.key === "Escape") {
+      closeAllMenus();
+      return;
+    }
+    if (!activeMenu) return;
+
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.closest(".menu-dropdown")) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const siblings = Array.from(
+          active.parentElement?.querySelectorAll<HTMLElement>(
+            ".menu-dropdown-item",
+          ) ?? [],
+        );
+        if (siblings.length === 0) return;
+        const idx = siblings.indexOf(active);
+        const offset = e.key === "ArrowDown" ? 1 : -1;
+        siblings[(idx + offset + siblings.length) % siblings.length]?.focus();
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        active.click();
+        return;
+      }
+    }
+
+    if (
+      (e.key === "ArrowRight" || e.key === "ArrowLeft") &&
+      active?.classList.contains("menu-item")
+    ) {
+      e.preventDefault();
+      moveMenuFocus(e.key === "ArrowRight" ? 1 : -1);
+    }
   });
 }

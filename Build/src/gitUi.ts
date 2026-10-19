@@ -6,26 +6,36 @@ import {
   gitPull,
   gitPush,
   gitStatus,
+  gitStatusPorcelain,
   isGitReady,
   syncAllFilesToWorker,
 } from "./git-service";
 import { showError, showLoading, showSuccess, hideLoading } from "./ui";
 import { showInfoDialog } from "./dialogs";
+import { gitStatusBadgeClass, parsePorcelainStatus } from "./gitStatus";
 
 export function renderGitStatus(container: HTMLElement, statusText: string): void {
   container.innerHTML = "";
-  if (!statusText || statusText.includes("nothing to commit")) {
+  const entries = parsePorcelainStatus(statusText);
+  if (entries.length === 0) {
     container.innerHTML = '<span class="git-status-empty">No changes</span>';
     return;
   }
-  const lines = statusText.split("\n").filter((l) => l.trim());
-  for (const line of lines) {
+  for (const entry of entries) {
     const item = document.createElement("div");
     item.className = "git-status-item";
+    item.title = entry.path;
+
+    const badge = document.createElement("span");
+    badge.className = `git-badge git-badge-${gitStatusBadgeClass(entry.code)}`;
+    badge.textContent = entry.code;
+    item.appendChild(badge);
+
     const name = document.createElement("span");
     name.className = "git-status-filename";
-    name.textContent = line;
+    name.textContent = entry.path;
     item.appendChild(name);
+
     container.appendChild(item);
   }
 }
@@ -34,7 +44,7 @@ export async function refreshGitStatus(): Promise<void> {
   const statusEl = document.getElementById("git-status");
   if (!statusEl) return;
   try {
-    const output = await gitStatus();
+    const output = await gitStatusPorcelain();
     renderGitStatus(statusEl, output);
   } catch {
   }

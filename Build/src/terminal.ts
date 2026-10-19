@@ -2,16 +2,60 @@ import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 import { executeCommand, setTerminalWriters } from "./shell";
+import {
+  applyTerminalKey,
+  EMPTY_LINE,
+  type TerminalLineState,
+} from "./terminalLine";
 
 let term: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
 let container: HTMLElement | null = null;
-let lineBuffer = "";
+let line: TerminalLineState = EMPTY_LINE;
 const history: string[] = [];
 let historyIndex = -1;
 
+const PROMPT = "$ ";
+const MAX_HISTORY = 100;
+
 export function getTerminal(): Terminal | null {
   return term;
+}
+
+function redrawLine(): void {
+  if (!term) return;
+  term.write(`\r\x1b[2K${PROMPT}${line.buffer}`);
+  const back = line.buffer.length - line.cursor;
+  if (back > 0) term.write(`\x1b[${back}D`);
+}
+
+function restorePrompt(): void {
+  line = EMPTY_LINE;
+  historyIndex = -1;
+  term?.write(PROMPT);
+}
+
+function useHistoryEntry(entry: string): void {
+  line = { buffer: entry, cursor: entry.length };
+  redrawLine();
+}
+
+async function submitLine(): Promise<void> {
+  const cmd = line.buffer;
+  term?.writeln("");
+  line = EMPTY_LINE;
+  historyIndex = -1;
+  if (!cmd.trim()) {
+    term?.write(PROMPT);
+    return;
+  }
+  if (history[history.length - 1] !== cmd) {
+    history.push(cmd);
+    if (history.length > MAX_HISTORY) history.shift();
+  }
+  await executeCommand(cmd).finally(() => {
+    term?.write(PROMPT);
+  });
 }
 
 export function createTerminal(el: HTMLElement): void {
@@ -59,79 +103,56 @@ export function createTerminal(el: HTMLElement): void {
   );
 
   term.write("Welcome to HTMLRunner terminal\r\n");
-  term.write("$ ");
+  term.write(PROMPT);
 
-  lineBuffer = "";
+  line = EMPTY_LINE;
 
   term.onKey((e) => {
     const { key, domEvent } = e;
+    const result = applyTerminalKey(line, key, domEvent.ctrlKey);
+    line = result.state;
 
-    if (domEvent.ctrlKey && key === "c") {
-      term?.write("^C\r\n$ ");
-      lineBuffer = "";
-      historyIndex = -1;
-      return;
-    }
-
-    if (domEvent.ctrlKey && key === "l") {
-      term?.write("\x1b[2J\x1b[H$ ");
-      lineBuffer = "";
-      return;
-    }
-
-    if (key === "\r") {
-      term?.writeln("");
-      const cmd = lineBuffer;
-      lineBuffer = "";
-      historyIndex = -1;
-      if (cmd.trim()) {
-        history.push(cmd);
-        executeCommand(cmd).finally(() => {
-          term?.write("$ ");
-        });
-      } else {
-        term?.write("$ ");
-      }
-    } else if (key === "\x7f") {
-      if (lineBuffer.length > 0) {
-        lineBuffer = lineBuffer.slice(0, -1);
-        term?.write("\b \b");
-      }
-    } else if (key === "\x1b[A") {
-      if (history.length > 0) {
-        const idx = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
-        const entry = history[idx];
-        if (entry !== undefined) {
-          historyIndex = idx;
-          clearLine();
-          lineBuffer = entry;
-          term?.write(entry);
-        }
-      }
-    } else if (key === "\x1b[B") {
-      if (historyIndex >= 0) {
-        const idx = historyIndex + 1;
-        if (idx >= history.length) {
-          historyIndex = -1;
-          clearLine();
-          lineBuffer = "";
-        } else {
+    switch (result.action) {
+      case "interrupt":
+        term?.write("^C\r\n");
+        restorePrompt();
+        return;
+      case "clear-screen":
+        term?.write("\x1b[2J\x1b[H");
+        redrawLine();
+        return;
+      case "submit":
+        void submitLine();
+        return;
+      case "history-prev":
+        if (history.length > 0) {
+          const idx =
+            historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
           const entry = history[idx];
           if (entry !== undefined) {
             historyIndex = idx;
-            clearLine();
-            lineBuffer = entry;
-            term?.write(entry);
+            useHistoryEntry(entry);
           }
         }
-      }
-    } else if (key === "\x1b[C") {
-    } else if (key === "\x1b[D") {
-    } else if (domEvent.ctrlKey && key === "a") {
-    } else if (domEvent.ctrlKey && key === "e") {
-    } else if (key.length === 1 && !domEvent.ctrlKey && !domEvent.altKey && !domEvent.metaKey) {
-      lineBuffer += key;
-      term?.write(key);
+        return;
+      case "history-next":
+        if (historyIndex >= 0) {
+          const idx = historyIndex + 1;
+          if (idx >= history.length) {
+            historyIndex = -1;
+            useHistoryEntry("");
+          } else {
+            const entry = history[idx];
+            if (entry !== undefined) {
+              historyIndex = idx;
+              useHistoryEntry(entry);
+            }
+          }
+        }
+        return;
+      case "none":
+        if (result.redraw) redrawLine();
+        return;
     }
   });
 
@@ -149,12 +170,5 @@ export function fitTerminal(): void {
 
 export function clearTerminal(): void {
   term?.clear();
-  term?.write("$ ");
-}
-
-function clearLine(): void {
-  if (!term) return;
-  for (let i = 0; i < lineBuffer.length; i++) {
-    term.write("\b \b");
-  }
+  term?.write(PROMPT);
 }
