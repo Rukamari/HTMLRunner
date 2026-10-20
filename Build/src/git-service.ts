@@ -10,6 +10,17 @@ let _ready = false;
 let _readyResolve: () => void;
 const _readyPromise = new Promise<void>((r) => { _readyResolve = r; });
 
+let _variant: string | null = null;
+let _fallbackReason: string | null = null;
+
+export function gitVariant(): string | null {
+  return _variant;
+}
+
+export function gitFallbackReason(): string | null {
+  return _fallbackReason;
+}
+
 export function gitReady(): Promise<void> {
   return _readyPromise;
 }
@@ -22,8 +33,14 @@ export function initGitService(worker: Worker): void {
   api = wrap<GitWorkerAPI>(worker);
 
   api.init("HTMLRunner", "runner@htmlrunner.app")
-    .then(({ variant, files }) => {
-      console.log(`Git ready (${variant})`);
+    .then(({ variant, files, fallbackReason }) => {
+      _variant = variant;
+      _fallbackReason = fallbackReason ?? null;
+      if (fallbackReason) {
+        console.warn(`Git ready (${variant}) — ${fallbackReason}`);
+      } else {
+        console.log(`Git ready (${variant})`);
+      }
       _ready = true;
       _readyResolve();
       if (files && files.length > 0) {

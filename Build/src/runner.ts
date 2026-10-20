@@ -1,8 +1,9 @@
 import { consoleInterceptor, navigationInterceptor } from "./console";
 import { showLoading, showError, hideLoading, switchOutput } from "./ui";
-import { clearConsole, logConsoleError } from "./console";
+import { clearConsole, logConsoleError, logConsoleInfo } from "./console";
 import { filesState, activeFileState } from "./appState";
 import { getVFS, isContainerReady } from "./container";
+import { detectCapabilities } from "./capabilities";
 import { getById } from "./dom";
 import { marked } from "marked";
 import type { ViteDevServer, ServerBridge } from "almostnode";
@@ -11,10 +12,32 @@ import type { FileTab } from "./types";
 let devServer: ViteDevServer | null = null;
 let serverBridge: ServerBridge | null = null;
 let previewReady = false;
+let compatModeNoticeShown = false;
+
+/**
+ * The in-browser dev server is powered by a service worker, which browsers only
+ * expose in a secure context. On a plain-HTTP origin the preview silently falls
+ * back to an inlined blob document; say so once instead of failing loudly.
+ */
+function ensurePreviewEnvironment(): boolean {
+  const caps = detectCapabilities();
+  if (caps.serviceWorker) return true;
+
+  if (!compatModeNoticeShown) {
+    compatModeNoticeShown = true;
+    logConsoleInfo(
+      `Preview compatibility mode (origin ${caps.origin}): service workers ` +
+        "need a secure context, so the in-browser dev server is disabled. " +
+        "Serve over HTTPS for live reload and module resolution.",
+    );
+  }
+  return false;
+}
 
 async function ensureDevServer(): Promise<boolean> {
   if (devServer && previewReady) return true;
   if (!isContainerReady()) return false;
+  if (!ensurePreviewEnvironment()) return false;
 
   try {
     const { ViteDevServer, getServerBridge } = await import("almostnode");

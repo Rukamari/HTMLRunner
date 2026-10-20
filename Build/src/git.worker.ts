@@ -1,8 +1,8 @@
 import { expose } from "comlink";
-import type { OpfsGit } from "wasm-git/lg2_opfs_auto.js";
-import type { GitFile, GitWorkerAPI } from "./gitWorkerTypes";
+import { loadGitBackend } from "./gitBackend";
+import type { GitBackend, GitFile, GitWorkerAPI } from "./gitWorkerTypes";
 
-let git: OpfsGit | null = null;
+let git: GitBackend | null = null;
 const REPO_NAME = "sandbox";
 let _mutex: Promise<unknown> = Promise.resolve();
 
@@ -32,21 +32,34 @@ async function withRetry<T>(fn: () => T | Promise<T>, maxRetries = 2): Promise<T
   throw new Error("Unreachable");
 }
 
+let capturedStdout: string[] | null = null;
+let recentStderr: string[] = [];
+const STDERR_LIMIT = 20;
+
+function onModulePrint(text: string): void {
+  capturedStdout?.push(text);
+}
+
+function onModulePrintErr(text: string): void {
+  recentStderr = [...recentStderr, text].slice(-STDERR_LIMIT);
+}
+
 async function runGitCommand(command: string, gitArgs: string[]): Promise<string> {
   if (!git) throw new Error("Git not initialized");
   await git.syncRepo(REPO_NAME);
 
   const stdout: string[] = [];
-  const origPrint = git.module.print;
-  const origPrintErr = git.module.printErr;
-  git.module.print = (text: string) => stdout.push(text);
-  git.module.printErr = () => {  };
+  capturedStdout = stdout;
+  recentStderr = [];
 
   try {
     await git.run([command, ...gitArgs]);
+  } catch (err) {
+    const detail = recentStderr.join("\n").trim();
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(detail ? `${message}\n${detail}` : message, { cause: err });
   } finally {
-    git.module.print = origPrint;
-    git.module.printErr = origPrintErr;
+    capturedStdout = null;
   }
 
   return stdout.join("\n");
@@ -110,8 +123,13 @@ function readAllFiles(): GitFile[] {
 const api: GitWorkerAPI = {
   async init(user = "HTMLRunner", email = "runner@htmlrunner.app") {
     return queue(async () => {
-      const { loadOpfsGit } = await import("wasm-git/lg2_opfs_auto.js");
-      git = await loadOpfsGit({ user, email });
+      const { backend, variant, fallbackReason } = await loadGitBackend({
+        user,
+        email,
+        print: onModulePrint,
+        printErr: onModulePrintErr,
+      });
+      git = backend;
 
       const found = await git.syncRepo(REPO_NAME);
       let files: GitFile[] = [];
@@ -123,7 +141,7 @@ const api: GitWorkerAPI = {
         await git.syncRepo(REPO_NAME);
       }
 
-      return { variant: git.variant || "unknown", files };
+      return { variant: variant || "unknown", files, fallbackReason };
     });
   },
 
@@ -137,13 +155,7 @@ const api: GitWorkerAPI = {
     return queue(async () => {
       if (!git) throw new Error("Git not initialized");
       await git.syncRepo(REPO_NAME);
-      const path = `${git.repoDir(REPO_NAME)}/${filePath}`;
-      await withRetry(() => {
-        try {
-          git!.FS.unlink(path);
-        } catch {
-        }
-      });
+      await withRetry(() => git!.deleteFile(REPO_NAME, filePath));
     });
   },
 

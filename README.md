@@ -190,7 +190,13 @@ function testFunction() {
    npm run dev
    ```
 
-   This starts Vite's dev server with hot reloading at `http://localhost:5173`
+   This starts Vite's dev server with hot reloading at `https://localhost:5173`.
+
+   HTTPS is **on by default**, and that is not cosmetic: `OPFS`, service
+   workers and even `crypto.randomUUID` only exist in a *secure context*
+   (HTTPS, or `http(s)` on localhost). On a plain-HTTP LAN address the
+   in-browser dev server and git silently lose their backends. See
+   [HTTPS and secure contexts](#https-and-secure-contexts).
 
 4. **Build for production**
 
@@ -226,6 +232,49 @@ npm run build       # Production build
 ```
 
 `typecheck` runs with strict null checks plus `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `exactOptionalPropertyTypes`, unused-symbol checks, and `verbatimModuleSyntax`, so invalid states fail before runtime.
+
+### HTTPS and secure contexts
+
+Browsers expose `OPFS`, service workers, `SharedArrayBuffer` and
+`crypto.randomUUID` **only in a secure context**: HTTPS, or `http(s)` on
+`localhost`. Serving the app from a plain-HTTP address (a LAN IP, a container
+hostname like `penguin`, a port-forward) doesn't break the browser — those
+APIs are simply absent, which shows up as:
+
+- `OPFS is not available in this context` and a git backend that never loads
+- `Failed to start dev server: Error: Service Workers not supported`
+- third-party scripts throwing `crypto.randomUUID is not a function`
+
+`npm run dev` fixes this by generating a certificate on first run and serving
+HTTPS. Certificates are cached in `Build/.certs/` (gitignored) and regenerated
+when they expire or the machine's hostnames/IPs change.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `HTTPS` | on | `false`/`0`/`off` disables HTTPS; `openssl` prefers the openssl generator over mkcert |
+| `HTTPS_HOSTS` | – | Extra comma-separated names to include, e.g. `penguin.linux.test` |
+
+Certificate generation uses **mkcert** when it is installed (so the certificate
+chains to a locally trusted CA), falling back to a self-signed certificate
+built with `openssl`. Both cover `localhost`, the machine name and every
+non-internal interface address.
+
+To develop from another device — for example a ChromeOS browser talking to a
+Crostini container — run with `--host` and trust the CA once:
+
+```bash
+npm run dev -- --host
+mkcert -CAROOT      # rootCA.pem lives here; import it into the client's trust store
+```
+
+ChromeOS: **Settings → Security and privacy → Manage certificates → Authorities
+→ Import**, then pick a device/extension to trust it for. Without importing the
+CA, the browser still gains a secure context after you dismiss the certificate
+warning once.
+
+To check what the current browser actually has, open **Help → System
+Diagnostics**; it reports the secure-context state, OPFS, service workers, the
+WebAssembly features in play and the git backend in use.
 
 ### Contributors
 

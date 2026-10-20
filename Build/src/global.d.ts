@@ -11,6 +11,10 @@ declare module "wasm-git/lg2_opfs_auto.js" {
     user?: string;
     email?: string;
     moduleArg?: object;
+    moduleOverrides?: {
+      print?: (text: string) => void;
+      printErr?: (text: string) => void;
+    };
   }): Promise<OpfsGit>;
 
   export interface OpfsFileSystem {
@@ -49,6 +53,33 @@ declare module "wasm-git/lg2_opfs_auto.js" {
   };
   export const VARIANT_FILES: Record<string, string>;
   export default loadOpfsGit;
+}
+
+declare module "wasm-git/lg2.js" {
+  export interface IdbfsFileSystem {
+    readdir(path: string): string[];
+    unlink(path: string): void;
+    mkdir(path: string): void;
+    chdir(path: string): void;
+    readFile(path: string, opts?: { encoding?: string }): string | Uint8Array;
+    writeFile(path: string, data: string): void;
+    mount(type: unknown, opts: object, mountpoint: string): void;
+    filesystems: Record<string, unknown>;
+    syncfs(populate: boolean, callback: (err?: Error | null) => void): void;
+    [key: string]: unknown;
+  }
+
+  export interface IdbfsModule {
+    FS: IdbfsFileSystem;
+    print: (text: string) => void;
+    printErr: (text: string) => void;
+    callMain(args: string[]): void | Promise<void>;
+    [key: string]: unknown;
+  }
+
+  export default function createGitModule(
+    moduleArg?: object,
+  ): Promise<IdbfsModule>;
 }
 
 declare module "*?worker&inline" {

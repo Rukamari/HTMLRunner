@@ -8,6 +8,7 @@ import {
 import { clearConsole, toggleTimestamps } from "./console";
 import { formatCode, runCode } from "./runner";
 import { showAbout, showShortcuts } from "./dialogs";
+import { showDiagnostics } from "./diagnostics";
 import {
   cloneAction,
   commitAction,
@@ -50,6 +51,7 @@ const MENU_ACTIONS = [
   "gitClone",
   "about",
   "openShortcuts",
+  "diagnostics",
 ] as const;
 
 type MenuAction = (typeof MENU_ACTIONS)[number];
@@ -107,6 +109,7 @@ const MENU_ACTION_MAP = {
   },
   about: () => showAbout(),
   openShortcuts: () => showShortcuts(),
+  diagnostics: () => showDiagnostics(),
 } satisfies Record<MenuAction, () => void>;
 
 let activeMenu: string | null = null;

@@ -21,6 +21,9 @@ dev-dist/
 .env
 .env.*
 
+# Local dev HTTPS certificates
+.certs/
+
 # IDE files
 .vscode/
 .idea/

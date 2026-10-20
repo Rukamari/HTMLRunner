@@ -277,3 +277,14 @@ export function logConsoleError(message: string, stack: StackInfo = {}): void {
   };
   pushConsoleEntry(entry);
 }
+
+/** Surface an informational note in the app console (not the preview's). */
+export function logConsoleInfo(message: string): void {
+  const entry: ConsoleMessage = {
+    type: "console",
+    level: "info",
+    data: [message],
+    timestamp: new Date().toISOString(),
+  };
+  pushConsoleEntry(entry);
+}
